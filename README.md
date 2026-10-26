@@ -56,7 +56,7 @@
 ### 참여자 ID를 잘못 넣었을 때
 연구자 화면 `참여자 기록` 탭에서 해당 기록의 ID 칸을 눌러 바로 고칠 수 있습니다.
 
-## 4. 실험이 끝나면 (매번)
+## 4. 실험이 끝나면
 
 연구자 화면 → `참여자 기록` 탭 → **`기록 + 최종 사진 (ZIP)`** 을 눌러 내려받습니다
 (파일 이름 예: `search_participants_의현_2026-10-26.zip`).
@@ -179,18 +179,10 @@ ZIP 안에는 이런 것이 들어 있습니다.
 **Q. 참여자에게 보이면 안 되는 것이 있나요?**
 연구자 화면과 이 문서는 참여자에게 보여 주지 마세요. 참여자는 검색 화면만 봅니다.
 
----
+## 9. 코드를 고치려면
 
-<details>
-<summary>관리자용 메모 (저장소 구성)</summary>
-
-- `index.html` — 첫 페이지
-- `search_system.html` — 도구 본체 (주소 뒤 `?view=search` / `?view=researcher`로 화면 선택, 없으면 한 창에서 둘 다)
-- `pool/pool.csv`, `pool/photos/` — 기본 사진 풀 (페이지가 시작할 때 자동으로 불러옴)
-- `.claude/skills/room-pool/` — 사진 태그 달기 도구 (Claude Code 스킬)
-- `CLAUDE.md` — 개발 인수인계 문서
-
-### 코드를 고치려면
+> 화면이나 기능을 바꾸고 싶으면 **가급적 의현에게 의견을 모아 전달해 주세요.** 의현이 한꺼번에 고쳐서 올리는 것이 충돌도 없고 세 사람의 실험 조건도 같게 유지됩니다.
+> 그래도 직접 고쳐야 할 때는 아래를 참고하세요.
 
 1. **권한 받기**: 의현에게 GitHub 아이디를 알려 주면 저장소 공동 작업자로 초대합니다 (Settings → Collaborators → Add people). 이메일로 온 초대를 수락하세요.
 2. **내려받기**: `git clone https://github.com/projectmuyu/hci_pilot.git`
@@ -210,5 +202,16 @@ Claude Code를 쓰면 `CLAUDE.md`(구조·저장 방식·주요 함수 정리)�
 - 아래를 바꾸면 **이미 쌓인 기록이 안 보이거나 기록 불러오기가 안 맞을 수 있습니다**: 저장 이름(`rs_archive`, `rs_pick` 등), 기록 형식(`participants.json` 구조), 사진 id 만드는 방식(`pool_` + 파일 이름).
 - 검색 규칙이나 태그를 바꾸면 같은 검색어라도 결과가 달라집니다. 실험 중이면 참여자 간 조건이 달라지니 주의하세요.
 - 권한 없이 제안만 하려면 저장소를 Fork해서 고친 뒤 Pull Request를 보내 주세요.
+
+---
+
+<details>
+<summary>관리자용 메모 (저장소 구성)</summary>
+
+- `index.html` — 첫 페이지
+- `search_system.html` — 도구 본체 (주소 뒤 `?view=search` / `?view=researcher`로 화면 선택, 없으면 한 창에서 둘 다)
+- `pool/pool.csv`, `pool/photos/` — 기본 사진 풀 (페이지가 시작할 때 자동으로 불러옴)
+- `.claude/skills/room-pool/` — 사진 태그 달기 도구 (Claude Code 스킬)
+- `CLAUDE.md` — 개발 인수인계 문서
 
 </details>
