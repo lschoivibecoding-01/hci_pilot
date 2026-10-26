@@ -11,6 +11,13 @@
 
 ## 화면 구성
 
+여는 주소에 따라 세 가지로 쓴다. 같은 PC·같은 브라우저면 두 창이 localStorage·IndexedDB를 함께 쓰고 `storage` 이벤트로 서로의 변경을 바로 받는다(기록, 진행 상태, 사진 풀). 기기가 다르면 공유되지 않는다(서버 없음).
+
+- `index.html`: 두 화면으로 가는 링크만 있는 첫 페이지.
+- `search_system.html?view=search` (검색 화면 전용, `SEARCH_PAGE`): 시작 화면(`renderStartUI`)에서 진행자·참여자 ID를 넣고 시작 → 검색 → 완료 화면의 "연구자에게 알려 주세요."를 누르면 다시 시작 화면. 연구자 패널(점 버튼, Ctrl+Shift+R)은 없다.
+- `search_system.html?view=researcher` (연구자 화면 전용, `RESEARCH_PAGE`): 사진 풀 관리·참여자 기록만. `검색 화면 열기 ↗` 링크, 진행 중인 참여자 표시와 `미완료로 끝내기`(두 번 눌러야 함). 이 창은 진행 상태 `P`를 쓰지 않는다(검색 창의 최신 상태를 덮어쓰지 않게).
+- 주소에 `view`가 없으면 아래처럼 한 창에서 둘 다 쓰는 예전 방식.
+
 1. **연구자 화면** (기본)
    - 오른쪽 위 `새 참여자 시작` → 참여자 ID 입력 모달(비우면 진행 안 됨) → 검색 화면. 진행 중인 참여자가 있으면 `P03 이어서 진행` 버튼도 나온다.
    - 탭 `사진 풀 관리`: `기본 풀 다시 맞추기`(http(s)일 때만 보임, 직접 고친 태그를 덮어씀), 사진 추가(드래그/파일/폴더, `pool.csv`를 함께 넣으면 태그 자동 적용), 태그 편집(Ctrl/⌘·Shift 다중 선택), 선택·전체 삭제(두 번 눌러야 삭제, Delete 키 지원), 풀 내보내기·불러오기(ZIP: `pool.csv` + `photos/*.jpg`). `pool.csv` 열은 `file, tags, contains`이고 tags는 `;`로 구분한다.
@@ -28,7 +35,9 @@
 | IndexedDB | DB `room-search-pool`, store `photos` | 사진 레코드 `{id, name, tags[], contains[], blob, thumb, addedAt, fromPool?}`. blob은 긴 변 1600px JPEG, thumb은 420px. 기본 풀 사진은 `fromPool: true`, id는 `pool_` + 파일 이름 해시라 다시 맞춰도 기록의 사진 참조가 유지된다 |
 | localStorage | `rs_pool_ver` | 마지막으로 맞춘 `pool/pool.csv`의 해시. 바뀌면 다음 시작 때 태그를 갱신하고 새 사진을 받고, 빠진 기본 풀 사진은 지운다(연구자가 직접 넣은 사진은 그대로) |
 | localStorage | `rs_pick` | 진행 중 참여자 `P`: `{pid, liked[], final, view, active, _sel, startedAt, finishedAt, queries[], likeLog[], archivedId}` |
-| localStorage | `rs_archive` | 참여자 기록 배열 `ARCH` |
+| localStorage | `rs_archive` | 참여자 기록 배열 `ARCH`. 고치기 전에 `reloadArch()`로 다른 창의 최신 기록부터 읽는다 |
+| localStorage | `rs_researcher` | 이 PC의 진행자 이름. 새 기록의 `researcher`, CSV 열, 내보내기 파일 이름에 붙는다 |
+| localStorage | `rs_pool_ping` | IndexedDB를 고칠 때마다 바꾸는 신호. 다른 창이 받아 사진 풀을 다시 읽는다 |
 | localStorage | `rs_settings`, `rs_sessions` | 예전 버전의 흔적. 지금 화면에서는 쓰지 않는다 |
 
 `contains`는 사진에 보이는 타깃 요소(식물·러그·스탠드 조명·벽 그림·따뜻한 조명)를 **보이면 다** 적은 표시로, 나중에 요소 포함 비율을 맞추는 데 쓴다. 타깃 요소는 태그(`식물·러그·액자·스탠드·따뜻한조명`)로도 달려 검색되고, room-pool 스킬의 `build_pool.py`가 이 태그에서 `contains`를 자동으로 채운다. 검색에서 빼지는 않는다(`isExcluded = () => false`).
@@ -37,7 +46,7 @@
 
 ```json
 {
-  "id": "a…", "no": 1, "label": "P01", "status": "완료 | 미완료",
+  "id": "a…", "no": 1, "label": "P01", "researcher": "의현", "status": "완료 | 미완료",
   "startedAt": "ISO (첫 검색 또는 첫 담기)", "finishedAt": "ISO",
   "queries": [{"q": "아늑한 침실", "at": "ISO"}],
   "liked": [{"id": "…", "name": "J11_의현.jpg", "qn": 1, "q": "아늑한 침실", "likedAt": "ISO"}],
@@ -51,7 +60,7 @@
 - `queries`는 검색 버튼/Enter를 누를 때마다 쌓이고, 최종 결정 뒤에는 쌓이지 않는다.
 - `liked[].qn/q`는 그 사진을 **마지막으로 담은** 검색이다.
 
-CSV 열: `no, participant_id, status, started_at, finished_at, query_count, queries, liked_count, liked_with_query, unliked_count, final_query, liked_files, final_file, final_in_liked_order`. 한 칸 안의 여러 값은 ` | `로 잇고, `liked_with_query`는 `사진@검색번호:검색어` 형식이다.
+CSV 열: `no, researcher, participant_id, status, started_at, finished_at, query_count, queries, liked_count, liked_with_query, unliked_count, final_query, liked_files, final_file, final_in_liked_order`. 한 칸 안의 여러 값은 ` | `로 잇고, `liked_with_query`는 `사진@검색번호:검색어` 형식이다.
 
 ## 검색 동작
 
@@ -74,4 +83,4 @@ CSV 열: `no, participant_id, status, started_at, finished_at, query_count, quer
 ## 남은 일
 
 - [ ] **사진별 CSV** (제안만 함, 사용자 답 대기): 담은 사진 한 장 = 한 줄. 열 `participant_id, photo, query_no, query, liked_at, where, is_final`. 참여자 기록 탭에 내보내기 버튼으로 추가.
-- [ ] 기록은 브라우저 localStorage에만 있으므로 세션마다 CSV/ZIP으로 백업하도록 안내되어 있다. 필요하면 기록 불러오기(JSON 가져오기) 기능을 검토.
+- [ ] 기록은 브라우저 localStorage에만 있으므로 세션마다 CSV/ZIP으로 백업하도록 안내되어 있다. 연구자 3명이 각자 PC에서 진행하고, 나중에 각자의 CSV(`researcher` 열로 구분)를 엑셀에서 이어 붙여 합치기로 했다. 기록 불러오기 기능은 만들지 않기로 함.

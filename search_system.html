@@ -180,7 +180,9 @@ a.btn{text-decoration:none;display:inline-block}
 
 .arch h3{font-size:18px}
 .arch-label{width:min(240px,100%)!important;padding:6px 10px!important;font-size:17px;font-weight:700}
-#pid-in{font-size:20px;padding:12px 14px}
+#pid-in,#who-in{font-size:20px;padding:12px 14px}
+#start-form{width:min(480px,100%);display:flex;flex-direction:column;gap:6px}
+#start-form label{margin-top:8px}
 .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600}
 .pill.ok{background:var(--accent-soft);color:var(--accent)}
 .pill.warn{background:var(--research-soft);color:var(--research)}
@@ -263,11 +265,13 @@ const DB = (() => {
   const tx = async (mode, fn) => { const db = await open(); if (!db) return null; return new Promise(res => { try{ const t = db.transaction('photos', mode), st = t.objectStore('photos'); const out = fn(st); t.oncomplete = () => res(out && out.result !== undefined ? out.result : out); t.onerror = () => res(null); }catch(e){ res(null); } }); };
   return {
     all: () => tx('readonly', st => st.getAll()),
-    put: rec => tx('readwrite', st => st.put(rec)),
-    del: id => tx('readwrite', st => st.delete(id)),
-    clear: () => tx('readwrite', st => st.clear())
+    put: rec => tx('readwrite', st => st.put(rec)).finally(poolPing),
+    del: id => tx('readwrite', st => st.delete(id)).finally(poolPing),
+    clear: () => tx('readwrite', st => st.clear()).finally(poolPing)
   };
 })();
+// 사진 풀이 바뀌었음을 다른 창에 알린다 (storage 이벤트용 신호)
+const poolPing = () => { try{ localStorage.setItem('rs_pool_ping', String(Date.now())); }catch(e){} };
 const LS = { get(k,d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
 
 /* ================= 상태 ================= */
@@ -369,17 +373,29 @@ function runSearch(q, seed){
 }
 
 /* ================= 렌더 ================= */
+// ?view=researcher → 연구자 화면만, ?view=search → 검색 화면만. 없으면 한 창에서 둘 다 (예전 방식)
+// 같은 브라우저라 두 창이 localStorage·IndexedDB를 함께 쓰고, storage 이벤트로 서로의 변경을 받는다
+const VIEW = new URLSearchParams(location.search).get('view');
+const SEARCH_PAGE = VIEW === 'search', RESEARCH_PAGE = VIEW === 'researcher';
 function render(){
-  P.active = S.mode === 'search'; savePick();
+  if (SEARCH_PAGE) S.mode = 'search';
+  if (RESEARCH_PAGE) S.mode = null; // 연구자 창은 진행 상태를 쓰지 않는다 (검색 창의 최신 상태를 덮어쓰지 않게)
+  else { P.active = S.mode === 'search'; savePick(); }
   if (S.mode === 'search') return renderSearchUI();
   document.body.classList.remove('search-mode');
   $('#brand').textContent = '방 사진 검색 · 연구자';
   const inProgress = !!P.pid && !P.final;
-  $('#topright').innerHTML = `<div class="row">${inProgress ? `<button class="btn sm" id="resume" type="button">${esc(P.pid)} 이어서 진행</button>` : ''}<button class="btn primary sm" id="open-search" type="button">새 참여자 시작</button></div>`;
-  $('#open-search').onclick = askParticipantId;
+  $('#topright').innerHTML = RESEARCH_PAGE
+    ? `<div class="row">${inProgress ? `<span class="small muted">검색 화면 진행 중 <b>${esc(P.pid)}</b> · 담은 사진 ${P.liked.length}장</span><button class="btn sm danger" id="abort" type="button">미완료로 끝내기</button>` : ''}<a class="btn primary sm" href="?view=search" target="_blank" rel="noopener">검색 화면 열기 ↗</a></div>`
+    : `<div class="row">${inProgress ? `<button class="btn sm" id="resume" type="button">${esc(P.pid)} 이어서 진행</button>` : ''}<button class="btn primary sm" id="open-search" type="button">새 참여자 시작</button></div>`;
+  const os = $('#open-search'); if (os) os.onclick = askParticipantId;
   const rs = $('#resume'); if (rs) rs.onclick = () => { S.mode = 'search'; render(); };
+  const ab = $('#abort'); if (ab) ab.onclick = () => {
+    if (!ab.dataset.sure){ ab.dataset.sure = 1; ab.textContent = '한 번 더 누르면 끝내기'; setTimeout(() => { if (ab.isConnected){ delete ab.dataset.sure; ab.textContent = '미완료로 끝내기'; } }, 4000); return; }
+    reloadPick(); resetSession(); render();
+  };
   const tab = S.rtab || 'pool';
-  $('#main').innerHTML = `<div class="stack"><div class="research-strip">연구자 화면 · "새 참여자 시작"에서 참여자 ID를 넣으면 검색 화면으로 넘어갑니다</div>
+  $('#main').innerHTML = `<div class="stack"><div class="research-strip">${RESEARCH_PAGE ? '연구자 화면 · 참여자는 "검색 화면 열기"로 연 창에서 진행합니다. 기록은 이 화면에 자동으로 쌓입니다' : '연구자 화면 · "새 참여자 시작"에서 참여자 ID를 넣으면 검색 화면으로 넘어갑니다'}</div>
     <div class="tabs" role="tablist"><button role="tab" data-rtab="pool" aria-selected="${tab==='pool'}">사진 풀 관리</button><button role="tab" data-rtab="archive" aria-selected="${tab==='archive'}">참여자 기록 <span class="mono">${ARCH.length}</span></button></div>
     <div id="body"></div></div>`;
   $$('[data-rtab]').forEach(b => b.onclick = () => { S.rtab = b.dataset.rtab; render(); });
@@ -618,8 +634,10 @@ async function syncDefaultPool(force){
 const photoById = id => S.photos.find(p => p.id === id);
 // 참여자 진행 상태: 마음에 든 사진, 최종 사진, 지금 보는 화면 (새로고침해도 유지)
 const PICK_KEY = 'rs_pick';
-const P = Object.assign({liked: [], final: null, view: 'search', startedAt: null, finishedAt: null}, LS.get(PICK_KEY, {}));
+const pickDefault = () => ({liked: [], final: null, view: 'search', startedAt: null, finishedAt: null});
+const P = Object.assign(pickDefault(), LS.get(PICK_KEY, {}));
 const savePick = () => LS.set(PICK_KEY, P);
+const reloadPick = () => { Object.keys(P).forEach(k => delete P[k]); Object.assign(P, pickDefault(), LS.get(PICK_KEY, {})); };
 const isLiked = id => P.liked.includes(id);
 function toggleLike(id){
   if (P.final) return;
@@ -654,6 +672,7 @@ function bindLikeButtons(root){ $$('[data-like]', root).forEach(b => b.onclick =
 function renderSearchUI(){
   document.body.classList.add('search-mode');
   $('#brand').textContent = ''; $('#topright').innerHTML = '';
+  if (SEARCH_PAGE && (!P.pid || S.nextUp)) return renderStartUI();
   if (P.final) return renderDoneUI();
   if (P.view === 'saved') return renderSavedUI();
   if (!S.lastQuery){
@@ -718,7 +737,21 @@ function renderDoneUI(){
     <h1>다음에 혼자 지낼 방으로 고른 사진</h1>
     ${p ? `<img alt="최종으로 고른 사진" src="${urlFor(p,'full')}">` : '<p class="muted">사진을 찾을 수 없습니다.</p>'}
     <button class="g-notify" id="to-manager" type="button">연구자에게 알려 주세요.</button></div>`;
-  $('#to-manager').onclick = () => { S.mode = null; render(); window.scrollTo(0,0); };
+  $('#to-manager').onclick = () => { if (SEARCH_PAGE) S.nextUp = true; else S.mode = null; render(); window.scrollTo(0,0); };
+}
+// 검색 화면 전용 시작 화면: 연구자가 진행자·참여자 ID를 넣고 참여자에게 넘긴다
+function renderStartUI(){
+  $('#main').innerHTML = `<div class="g-home"><form class="panel g-confirm" id="start-form" aria-label="참여자 시작">
+    <h2>참여자 시작</h2>
+    <label class="small muted" for="who-in">진행자</label><input type="text" id="who-in" value="${esc(LS.get(WHO_KEY, ''))}" placeholder="예: 의현" autocomplete="off">
+    <label class="small muted" for="pid-in">참여자 ID</label><input type="text" id="pid-in" placeholder="예: P03" autocomplete="off" required>
+    <div class="row" style="justify-content:flex-end"><button class="g-btn" type="submit">시작</button></div></form></div>`;
+  const inp = $('#pid-in'); inp.focus();
+  $('#start-form').onsubmit = e => {
+    e.preventDefault(); const id = inp.value.trim(); if (!id){ inp.focus(); return; }
+    LS.set(WHO_KEY, $('#who-in').value.trim());
+    resetSession(); P.pid = id; savePick(); S.nextUp = false; renderSearchUI(); window.scrollTo(0,0);
+  };
 }
 
 function openPreview(id, list, fromSaved){
@@ -765,11 +798,15 @@ function askParticipantId(){
 const ARCH_KEY = 'rs_archive';
 let ARCH = LS.get(ARCH_KEY, []);
 const saveArch = () => LS.set(ARCH_KEY, ARCH);
+const reloadArch = () => { ARCH = LS.get(ARCH_KEY, []); }; // 고치기 전에 다른 창의 최신 기록부터 읽는다
+const WHO_KEY = 'rs_researcher'; // 이 PC의 진행자 이름. 기록마다 붙어 나중에 세 사람 기록을 합칠 때 구분한다
+const fileTag = () => { const w = LS.get(WHO_KEY, '').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 20); return (w ? w + '_' : '') + new Date().toISOString().slice(0,10); };
 const refOf = id => { const p = photoById(id); return {id, name: p ? p.name : id}; };
 const likedRef = id => { const add = (P.likeLog || []).filter(e => e.id === id && e.action === '담기').pop(); return Object.assign(refOf(id), add ? {qn: add.qn, q: add.q, likedAt: add.at} : {}); };
 function archiveCurrent(status){
+  reloadArch();
   const no = (ARCH.reduce((m, r) => Math.max(m, r.no || 0), 0)) + 1;
-  const rec = {id: 'a' + Date.now().toString(36), no, label: P.pid || '', note: '', status,
+  const rec = {id: 'a' + Date.now().toString(36), no, label: P.pid || '', researcher: LS.get(WHO_KEY, ''), note: '', status,
     startedAt: P.startedAt, finishedAt: P.finishedAt || new Date().toISOString(),
     liked: P.liked.map(likedRef), final: P.final ? refOf(P.final) : null, queries: (P.queries || []).slice(),
     likeLog: (P.likeLog || []).map(e => Object.assign({}, e, {name: refOf(e.id).name}))};
@@ -785,6 +822,7 @@ function renderArchive(){
   const list = ARCH.slice().reverse();
   const done = ARCH.filter(r => r.status === '완료').length;
   $('#body').innerHTML = `<div class="stack">
+    <div class="row"><label class="small" for="who">진행자</label><input type="text" id="who" value="${esc(LS.get(WHO_KEY, ''))}" placeholder="예: 의현" autocomplete="off" style="width:160px"><span class="small muted">이 PC에서 진행하는 사람. 새 기록과 CSV 파일 이름에 붙습니다</span></div>
     <div class="row between"><p class="small muted">최종 선택을 마치면 자동으로 기록됩니다. 최종 선택 전에 다음 참여자로 넘어가면 "미완료"로 남습니다. · 완료 <b class="mono">${done}</b> · 전체 <b class="mono">${ARCH.length}</b></p>
       <div class="row"><button class="btn sm" id="arch-csv" ${ARCH.length ? '' : 'disabled'}>CSV 내보내기</button><button class="btn sm" id="arch-zip" ${ARCH.length ? '' : 'disabled'}>기록 + 최종 사진 (ZIP)</button></div></div>
     ${list.length ? list.map(r => `<div class="card stack arch" data-arch="${r.id}">
@@ -792,25 +830,26 @@ function renderArchive(){
         <div class="row"><span class="mono small muted">#${r.no}</span><input type="text" class="arch-label" data-f="label" value="${esc(r.label)}" placeholder="참여자 ID" aria-label="참여자 ID (#${r.no})"><span class="pill ${r.status === '완료' ? 'ok' : 'warn'}">${r.status}</span></div>
         <div class="row">${r.final && photoById(r.final.id) ? `<a class="btn sm" href="${urlFor(photoById(r.final.id),'full')}" download="P${r.no}_FINAL_${esc(r.final.name.replace(/\.[^.]+$/, ''))}.jpg">최종 사진 저장</a>` : ''}<button class="btn sm danger" data-del="${r.id}" type="button">기록 삭제</button></div>
       </div>
-      <dl class="kv"><dt>${r.status === '완료' ? '결정 시각' : '기록 시각'}</dt><dd class="mono">${fmtTime(r.finishedAt)} (첫 검색부터 ${durMin(r)})</dd>
+      <dl class="kv"><dt>진행자</dt><dd>${esc(r.researcher || '—')}</dd><dt>${r.status === '완료' ? '결정 시각' : '기록 시각'}</dt><dd class="mono">${fmtTime(r.finishedAt)} (첫 검색부터 ${durMin(r)})</dd>
         <dt>검색어 (${(r.queries || []).length}회)</dt><dd>${(r.queries || []).length ? `<ol class="q-list">${r.queries.map(x => `<li><span class="mono small muted">${new Date(x.at).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'})}</span> ${esc(x.q)}</li>`).join('')}</ol>` : '—'}</dd>
         <dt>마음에 든 사진</dt><dd class="mono">${r.liked.length}장</dd>
         <dt>최종 사진</dt><dd class="mono" style="word-break:break-all">${r.final ? esc(r.final.name) : '—'}</dd></dl>
       <div class="g-strip">${r.liked.map(ref => thumbHTML(ref, r.final && ref.id === r.final.id)).join('') || '<p class="small muted">담은 사진 없음</p>'}</div>
     </div>`).join('') : '<div class="empty card">아직 기록이 없습니다. 참여자가 최종 사진을 고르면 여기에 쌓입니다.</div>'}
   </div>`;
-  $$('.arch-label').forEach(inp => inp.oninput = () => { const r = ARCH.find(x => x.id === inp.closest('[data-arch]').dataset.arch); if (r){ r.label = inp.value; saveArch(); } });
+  $('#who').oninput = e => LS.set(WHO_KEY, e.target.value.trim());
+  $$('.arch-label').forEach(inp => inp.oninput = () => { reloadArch(); const r = ARCH.find(x => x.id === inp.closest('[data-arch]').dataset.arch); if (r){ r.label = inp.value; saveArch(); } });
   $$('[data-del]').forEach(b => b.onclick = () => {
     if (!b.dataset.sure){ b.dataset.sure = 1; b.textContent = '한 번 더 누르면 삭제'; setTimeout(() => { if (b.isConnected){ delete b.dataset.sure; b.textContent = '기록 삭제'; } }, 4000); return; }
-    ARCH = ARCH.filter(r => r.id !== b.dataset.del); saveArch(); render();
+    reloadArch(); ARCH = ARCH.filter(r => r.id !== b.dataset.del); saveArch(); render();
   });
-  const csv = $('#arch-csv'); if (csv) csv.onclick = () => download(`search_participants_${new Date().toISOString().slice(0,10)}.csv`, '﻿' + archiveCSV(), 'text/csv');
+  const csv = $('#arch-csv'); if (csv) csv.onclick = () => download(`search_participants_${fileTag()}.csv`, '﻿' + archiveCSV(), 'text/csv');
   const zp = $('#arch-zip'); if (zp) zp.onclick = exportArchiveZip;
 }
 function archiveCSV(){
   const cell = v => { const x = String(v ?? ''); return /[",\n]/.test(x) ? `"${x.replace(/"/g,'""')}"` : x; };
-  const head = ['no','participant_id','status','started_at','finished_at','query_count','queries','liked_count','liked_with_query','unliked_count','final_query','liked_files','final_file','final_in_liked_order'];
-  const rows = ARCH.map(r => [r.no, r.label, r.status, r.startedAt || '', r.finishedAt || '', (r.queries || []).length, (r.queries || []).map(x => x.q).join(' | '), r.liked.length, r.liked.map(x => `${x.name}@${x.qn ? x.qn + ':' + x.q : '-'}`).join(' | '), (r.likeLog || []).filter(e => e.action === '빼기').length, (() => { const f = r.final && r.liked.find(x => x.id === r.final.id); return f && f.qn ? `${f.qn}:${f.q}` : ''; })(), r.liked.map(x => x.name).join('|'), r.final ? r.final.name : '', r.final ? r.liked.findIndex(x => x.id === r.final.id) + 1 : '']);
+  const head = ['no','researcher','participant_id','status','started_at','finished_at','query_count','queries','liked_count','liked_with_query','unliked_count','final_query','liked_files','final_file','final_in_liked_order'];
+  const rows = ARCH.map(r => [r.no, r.researcher || '', r.label, r.status, r.startedAt || '', r.finishedAt || '', (r.queries || []).length, (r.queries || []).map(x => x.q).join(' | '), r.liked.length, r.liked.map(x => `${x.name}@${x.qn ? x.qn + ':' + x.q : '-'}`).join(' | '), (r.likeLog || []).filter(e => e.action === '빼기').length, (() => { const f = r.final && r.liked.find(x => x.id === r.final.id); return f && f.qn ? `${f.qn}:${f.q}` : ''; })(), r.liked.map(x => x.name).join('|'), r.final ? r.final.name : '', r.final ? r.liked.findIndex(x => x.id === r.final.id) + 1 : '']);
   return [head.join(','), ...rows.map(r => r.map(cell).join(','))].join('\n');
 }
 async function exportArchiveZip(){
@@ -820,10 +859,10 @@ async function exportArchiveZip(){
   zip.file('participants.csv', '﻿' + archiveCSV());
   zip.file('participants.json', JSON.stringify(ARCH, null, 1));
   for (const r of ARCH){
-    const dir = `P${String(r.no).padStart(2,'0')}${r.label ? '_' + r.label.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 30) : ''}/`;
+    const dir = `${r.researcher ? r.researcher.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 20) + '_' : ''}P${String(r.no).padStart(2,'0')}${r.label ? '_' + r.label.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 30) : ''}/`;
     for (const ref of r.liked){ const p = photoById(ref.id); if (p) zip.file(dir + (r.final && ref.id === r.final.id ? 'FINAL_' : 'liked_') + ref.name.replace(/\.[^.]+$/, '') + '.jpg', p.blob); }
   }
-  download(`search_participants_${new Date().toISOString().slice(0,10)}.zip`, await zip.generateAsync({type:'blob'}), 'application/zip');
+  download(`search_participants_${fileTag()}.zip`, await zip.generateAsync({type:'blob'}), 'application/zip');
 }
 
 /* ---------- 연구자 패널 (검색 화면에서 나가기) ---------- */
@@ -835,7 +874,34 @@ function renderRx(){
 }
 const toggleRx = () => { const p = $('#rx-panel'); p.hidden = !p.hidden; renderRx(); };
 $('#rx-toggle').onclick = toggleRx;
-document.addEventListener('keydown', e => { if (e.ctrlKey && e.shiftKey && (e.key === 'R' || e.key === 'r')){ e.preventDefault(); toggleRx(); } });
+$('#rx-toggle').hidden = !!VIEW; // 화면을 나눠 열면 연구자 패널을 쓰지 않는다 (검색 화면에서 연구자 화면으로 가는 길 없음)
+document.addEventListener('keydown', e => { if (!VIEW && e.ctrlKey && e.shiftKey && (e.key === 'R' || e.key === 'r')){ e.preventDefault(); toggleRx(); } });
+
+/* ---------- 다른 창의 변경 받기 (연구자 창 ↔ 검색 창) ---------- */
+let poolTimer = null;
+// 연구자 화면을 새로 그린다. 기록의 참여자 ID나 태그를 고치는 중이면 건너뛰고, 진행자 칸에 있던 커서는 되돌린다
+function rerenderResearcher(){
+  const a = document.activeElement;
+  if (a && a.matches('.arch-label, #editor input')) return;
+  const refocus = a && a.id === 'who';
+  render();
+  const w = refocus && $('#who'); if (w){ w.focus(); w.setSelectionRange(w.value.length, w.value.length); }
+}
+window.addEventListener('storage', e => {
+  if (e.key === ARCH_KEY){
+    reloadArch();
+    if (S.mode !== 'search') rerenderResearcher();
+  }
+  if (e.key === PICK_KEY){
+    reloadPick();
+    if (RESEARCH_PAGE) rerenderResearcher(); // 진행 중 표시 갱신
+    else if (SEARCH_PAGE && !P.pid){ S.nextUp = false; S.lastQuery = ''; render(); } // 연구자 창에서 "미완료로 끝내기"
+  }
+  if (e.key === 'rs_pool_ping'){
+    clearTimeout(poolTimer);
+    poolTimer = setTimeout(async () => { await loadPhotos(); if (S.mode !== 'search' && (S.rtab || 'pool') === 'pool' && !document.querySelector('.pool-loading')) render(); }, 800);
+  }
+});
 
 /* ---------- 시작 ---------- */
 (async () => { await loadPhotos(); if (P.active) S.mode = 'search'; render(); if (await syncDefaultPool()) render(); })();
