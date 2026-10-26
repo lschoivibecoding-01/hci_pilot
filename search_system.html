@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>검색</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: researcher pool manager = grid + sticky editor; participant view = search column + saved tray. Researcher screens carry an amber strip. */
+:root{
+  --bg:#F3F5F4; --surface:#FFFFFF; --sunk:#E9EDEB; --ink:#17201D; --muted:#5B6964; --line:#D8DFDC;
+  --accent:#2C6A56; --accent-ink:#FFFFFF; --accent-soft:#E0EDE7;
+  --research:#7A4C0C; --research-soft:#FBEFD9; --danger:#B3261E; --danger-soft:#FBE4E2;
+  --f-body:'IBM Plex Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1412; --surface:#172019; --sunk:#111915; --ink:#E5ECE8; --muted:#9AA9A3; --line:#2A3631;
+  --accent:#78C2A6; --accent-ink:#0E1512; --accent-soft:#1D3229;
+  --research:#F1C47E; --research-soft:#2D2313; --danger:#F28A82; --danger-soft:#3A1D1B; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1412; --surface:#172019; --sunk:#111915; --ink:#E5ECE8; --muted:#9AA9A3; --line:#2A3631;
+  --accent:#78C2A6; --accent-ink:#0E1512; --accent-soft:#1D3229;
+  --research:#F1C47E; --research-soft:#2D2313; --danger:#F28A82; --danger-soft:#3A1D1B; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{min-height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+h1,h2,h3{margin:0;text-wrap:balance;line-height:1.3} h1{font-size:24px} h2{font-size:18px;font-weight:600} h3{font-size:15px;font-weight:600}
+p{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:1240px;margin:0 auto}
+.narrow{max-width:720px;margin:0 auto}
+.topbar{display:flex;align-items:center;gap:12px;justify-content:space-between;padding-block:14px;border-bottom:1px solid var(--line);margin-bottom:24px}
+.brand{font-weight:600}
+.timer{font-family:var(--f-mono);font-variant-numeric:tabular-nums;padding:4px 10px;border-radius:999px;background:var(--sunk)}
+.timer.low{background:var(--danger-soft);color:var(--danger)}
+.stack{display:flex;flex-direction:column;gap:16px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.between{justify-content:space-between}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
+.muted{color:var(--muted)} .small{font-size:13px} .mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.btn{white-space:nowrap;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 16px;cursor:pointer;font-weight:500}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--danger)}
+.btn.ghost{background:transparent}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input[type=text],input[type=number],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 12px;width:100%}
+label.field{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted);font-weight:500}
+.research-strip{display:flex;align-items:center;gap:8px;background:var(--research-soft);color:var(--research);border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600}
+.research-strip::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--research)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tabs button{border:0;background:none;padding:10px 14px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;font-weight:500}
+.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent)}
+.stats{display:flex;gap:20px;flex-wrap:wrap;font-size:14px}
+.stats b{font-family:var(--f-mono);font-size:18px;display:block}
+/* pool manager */
+.manager{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start}
+.manager.solo{grid-template-columns:1fr}
+@media (max-width:900px){.manager{grid-template-columns:1fr}}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--muted);background:var(--surface)}
+.drop.over{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.pitem{position:relative;border:2px solid transparent;border-radius:10px;overflow:hidden;background:var(--surface);cursor:pointer;padding:0;text-align:left}
+.pitem[aria-pressed=true]{border-color:var(--accent)}
+.pitem img{display:block;width:100%;aspect-ratio:3/2;object-fit:cover;background:var(--sunk)}
+.pitem .meta{padding:6px 8px;font-size:12px;color:var(--muted);line-height:1.35;min-height:38px;word-break:break-all}
+.pitem .flag{position:absolute;left:6px;top:6px;font-size:11px;font-weight:600;border-radius:999px;padding:1px 8px}
+.flag.ex{background:var(--danger);color:#fff}
+.flag.none{background:var(--research);color:#fff}
+.editor{position:sticky;top:12px;display:flex;flex-direction:column;gap:14px;max-height:calc(100vh - 24px);overflow:auto}
+.taggroup{display:flex;flex-direction:column;gap:6px}
+.taggroup>span{font-size:12px;color:var(--muted);font-weight:600}
+.tagbtns{display:flex;flex-wrap:wrap;gap:6px}
+.tagbtn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:13px;cursor:pointer}
+.tagbtn[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tagbtn[aria-pressed=mixed]{background:var(--accent-soft);border-color:var(--accent)}
+.tagbtn.target[aria-pressed=true]{background:var(--danger);border-color:var(--danger);color:#fff}
+.tagbtn.target[aria-pressed=mixed]{background:var(--danger-soft);border-color:var(--danger)}
+.chk{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:14px;cursor:pointer}
+.chk input{accent-color:var(--accent)}
+/* participant */
+.task{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:20px;align-items:start}
+@media (max-width:860px){.task{grid-template-columns:1fr}}
+.tray{position:sticky;top:12px;display:flex;flex-direction:column;gap:12px}
+.tray-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.thumb{position:relative;border-radius:8px;overflow:hidden;background:var(--sunk);aspect-ratio:3/2}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.thumb .x{position:absolute;top:4px;right:4px;border:0;border-radius:50%;width:22px;height:22px;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;padding:0;line-height:22px}
+.progress{height:6px;border-radius:3px;background:var(--sunk);overflow:hidden}
+.progress>i{display:block;height:100%;background:var(--accent);transition:width .3s}
+.searchbar{display:flex;gap:8px}
+.searchbar input{font-size:16px;padding:12px 16px;border-radius:999px}
+.results{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.result{border:0;padding:0;background:var(--sunk);border-radius:8px;overflow:hidden;cursor:zoom-in;aspect-ratio:3/2;position:relative}
+.result img{width:100%;height:100%;object-fit:cover;display:block}
+.result .saved-badge{position:absolute;left:6px;top:6px;background:var(--accent);color:var(--accent-ink);font-size:12px;border-radius:999px;padding:1px 8px}
+.banner{padding:12px 16px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-weight:500}
+.empty{padding:40px 20px;text-align:center;color:var(--muted)}
+.modal{position:fixed;inset:0;background:rgba(10,14,12,.62);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal .panel{background:var(--surface);border-radius:12px;max-width:1000px;width:100%;max-height:100%;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.modal .panel>img{width:100%;border-radius:8px;display:block}
+.pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.pick{border:2px solid transparent;border-radius:10px;padding:0;background:none;cursor:pointer;overflow:hidden}
+.pick[aria-pressed=true]{border-color:var(--accent)}
+.pick img{display:block;width:100%;aspect-ratio:3/2;object-fit:cover}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--muted);white-space:nowrap}
+td.num{text-align:right;font-family:var(--f-mono)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:14px} .kv dt{color:var(--muted)} .kv dd{margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;z-index:70;font-size:14px}
+#rx-toggle{position:fixed;right:8px;bottom:8px;width:14px;height:14px;border-radius:50%;border:0;background:var(--line);opacity:.5;cursor:pointer;z-index:60}
+#rx-panel{position:fixed;right:12px;bottom:32px;width:min(320px,calc(100vw - 24px));background:var(--surface);border:1px solid var(--research);border-radius:12px;padding:14px;z-index:61;display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+.prog-bar{height:8px;border-radius:4px;background:var(--sunk);overflow:hidden}.prog-bar i{display:block;height:100%;background:var(--accent)}
+
+/* participant: search-engine look */
+body.search-mode .topbar{display:none}
+.g-home{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding-top:40px}
+.g-logo{font-size:44px;font-weight:700;letter-spacing:-.03em;color:var(--ink);background:none;border:0;cursor:default;padding:0}
+.g-logo.sm{font-size:22px;cursor:pointer;white-space:nowrap}
+.g-form{display:flex;align-items:center;width:min(640px,100%);border:1px solid var(--line);border-radius:999px;background:var(--surface);padding:4px 4px 4px 20px;box-shadow:0 1px 6px rgba(32,40,36,.08)}
+.g-form:focus-within{box-shadow:0 2px 10px rgba(32,40,36,.16)}
+.g-form input{flex:1;min-width:0;border:0;background:none;font-size:17px;padding:10px 0;outline:none}
+.g-btn{border:0;background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:9px 20px;cursor:pointer;font-weight:600;white-space:nowrap}
+.g-top{display:flex;align-items:center;gap:20px;padding-block:18px;border-bottom:1px solid var(--line);margin-bottom:18px;flex-wrap:wrap}
+.g-top .g-form{width:min(640px,100%)}
+.g-grid{display:flex;flex-wrap:wrap;gap:8px}
+.g-item{height:190px;flex:1 1 250px;border:0;padding:0;border-radius:8px;overflow:hidden;background:var(--sunk);cursor:pointer;max-width:100%}
+.g-item img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .2s}
+.g-item:hover img{transform:scale(1.03)}
+.g-fill{flex:10 1 0;height:0}
+@media (max-width:520px){.g-item{height:130px}.g-logo{font-size:34px}}
+@media (prefers-reduced-motion:reduce){.g-item img{transition:none}}
+a.btn{text-decoration:none;display:inline-block}
+
+/* likes · saved · final */
+.g-item{position:relative}
+.g-open{border:0;padding:0;margin:0;width:100%;height:100%;background:none;cursor:pointer;display:block}
+.g-like{position:absolute;top:8px;right:8px;width:38px;height:38px;border-radius:50%;border:0;display:grid;place-items:center;cursor:pointer;background:rgba(255,255,255,.88);color:#8a948f;box-shadow:0 1px 4px rgba(0,0,0,.18);transition:transform .12s}
+.g-like:hover{transform:scale(1.08)}
+.g-like.on{background:var(--accent);color:var(--accent-ink)}
+.g-zoom{position:absolute;bottom:8px;right:8px;width:34px;height:34px;border-radius:50%;border:0;display:grid;place-items:center;cursor:zoom-in;background:rgba(255,255,255,.88);color:#3a4440}
+.g-check{position:absolute;top:8px;left:8px;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:none;place-items:center;font-weight:700}
+.g-pick .g-item{outline:3px solid transparent;outline-offset:-3px}
+.g-pick .g-item.sel{outline-color:var(--accent)}
+.g-pick .g-item.sel .g-check{display:grid}
+.g-saved{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:9px 16px;cursor:pointer;font-weight:600;color:var(--muted);white-space:nowrap}
+.g-saved.has{color:var(--accent);border-color:var(--accent)}
+.g-saved b{font-family:var(--f-mono);min-width:1.4em;text-align:center}
+.g-bar{display:flex;justify-content:flex-end;padding-top:18px}
+.g-title{font-size:22px}
+.g-guide{margin-bottom:14px}
+.g-decide{position:sticky;bottom:0;display:flex;justify-content:flex-end;align-items:center;gap:16px;padding:16px 0 calc(16px + env(safe-area-inset-bottom,0px));margin-top:18px;background:var(--bg);border-top:1px solid var(--line)}
+.g-btn:disabled{opacity:.45;cursor:not-allowed}
+.g-like-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--accent);background:var(--surface);color:var(--accent);border-radius:999px;padding:9px 18px;cursor:pointer;font-weight:600;white-space:nowrap}
+.g-like-btn.on{background:var(--accent);color:var(--accent-ink)}
+.g-confirm{max-width:720px}
+.g-confirm h2{font-size:22px}
+.g-done{display:flex;flex-direction:column;align-items:center;gap:14px;padding-block:40px;text-align:center}
+.g-done img{max-width:min(960px,100%);border-radius:12px;display:block}
+.g-done h1{font-size:26px}
+.g-exit{margin-top:24px;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:7px 16px;font-size:13px;cursor:pointer}
+.g-exit:hover{color:var(--ink);border-color:var(--muted)}
+.g-notify{border:0;background:none;padding:6px 10px;color:var(--muted);font:inherit;cursor:pointer;border-radius:6px}
+.g-notify:hover{color:var(--ink)}
+.g-done-kicker{color:var(--accent);font-weight:700}
+.g-strip{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+.g-strip figure{margin:0;flex:0 0 160px;display:flex;flex-direction:column;gap:4px}
+.g-strip img{width:160px;aspect-ratio:3/2;object-fit:cover;border-radius:6px;border:3px solid transparent}
+.g-strip figure.fin img{border-color:var(--accent)}
+.g-strip figcaption{font-size:11px;color:var(--muted);word-break:break-all}
+@media (prefers-reduced-motion:reduce){.g-like{transition:none}}
+
+.arch h3{font-size:18px}
+.arch-label{width:min(240px,100%)!important;padding:6px 10px!important;font-size:17px;font-weight:700}
+#pid-in{font-size:20px;padding:12px 14px}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600}
+.pill.ok{background:var(--accent-soft);color:var(--accent)}
+.pill.warn{background:var(--research-soft);color:var(--research)}
+.ph-missing{width:160px;aspect-ratio:3/2;border-radius:6px;background:var(--sunk);display:grid;place-items:center;font-size:12px;color:var(--muted)}
+.q-list{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:2px}
+.q-list li{line-height:1.5}
+.q-tag{display:block;margin-top:2px;color:var(--accent);font-weight:600}
+</style>
+
+<div class="wrap">
+  <header class="topbar"><div class="brand" id="brand">방 사진 검색</div><div id="topright"></div></header>
+  <main id="main"></main>
+</div>
+<button id="rx-toggle" aria-label="연구자 패널" title="연구자 패널 (Ctrl+Shift+R)"></button>
+<div id="rx-panel" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+/* ================= 설정값 ================= */
+const TARGETS = [
+  {id:'plant', name:'식물', kw:['식물','화분','몬스테라','선인장','다육','plant','plants','greenery','꽃']},
+  {id:'rug', name:'러그', kw:['러그','카펫','카페트','rug','carpet']},
+  {id:'lamp', name:'스탠드 조명', kw:['스탠드','램프','무드등','lamp']},
+  {id:'art', name:'벽 그림', kw:['그림','액자','포스터','art','poster','painting','frame']},
+  {id:'warm', name:'따뜻한 조명', kw:['간접조명','전구색','노란조명','warm light']},
+  {id:'bedding', name:'겹친 침구', kw:['호텔침구','쿠션','블랭킷','throw','pillows']}
+];
+const TAG_GROUPS = [
+  {name:'방 종류', tags:['침실','원룸','작은방','거실','오피스텔','다락방','작업실']},
+  {name:'분위기·스타일', tags:['미니멀','모던','북유럽','빈티지','내추럴','아늑한','깔끔한','호텔','인더스트리얼','앤틱']},
+  {name:'색·톤·빛', tags:['화이트','베이지','우드','그레이','블랙','그린','블루','핑크','레드','밝은','어두운','햇살','노을','저녁','야경']},
+  {name:'가구·구성', tags:['책상','소파','수납장','책장','옷장','거울','커튼','큰창문','침대프레임','넓은','좁은','화장대']},
+  {name:'전망·특징', tags:['시티뷰','리버뷰','벽난로','사진벽','곡선','판타지']}
+];
+// 한국어 태그를 영어 검색어로도 찾을 수 있게 하는 동의어 (검색 색인에만 쓰임)
+const SYN = {
+  '거실':['living room','livingroom','lounge','소파'],'작업실':['studio','workspace','atelier','작업'],'레드':['red','빨간','와인'],'노을':['sunset','golden hour','석양'],'저녁':['evening','night','밤'],
+  '야경':['night','night view','city lights','밤','도시'],'화장대':['vanity','dresser'],'시티뷰':['city view','city','skyline','도시','전망','view'],'리버뷰':['river view','river','한강','강','전망','view'],
+  '벽난로':['fireplace'],'사진벽':['photo wall','gallery wall','poster wall','사진','포스터'],'곡선':['curved','organic','round','둥근'],'판타지':['fantasy','dreamy','몽환'],
+  '침실':['bedroom','bed room','방'],'원룸':['studio','one room','oneroom','자취방','방'],'작은방':['small room','tiny','방'],'오피스텔':['officetel','apartment','방'],'다락방':['attic','loft'],
+  '미니멀':['minimal','minimalist','심플','simple'],'모던':['modern','contemporary'],'북유럽':['scandinavian','nordic','scandi'],'빈티지':['vintage','retro','레트로'],
+  '내추럴':['natural','자연'],'아늑한':['cozy','cosy','포근','따뜻한','warm'],'깔끔한':['clean','tidy','neat'],'호텔':['hotel','luxury','고급'],'인더스트리얼':['industrial'],'앤틱':['antique','classic','클래식'],
+  '화이트':['white','흰','하얀'],'베이지':['beige','cream','크림'],'우드':['wood','wooden','나무','원목'],'그레이':['gray','grey','회색'],'블랙':['black','검정','dark'],'그린':['green','초록','민트'],
+  '블루':['blue','파란','하늘'],'핑크':['pink','분홍'],'밝은':['bright','light','환한'],'어두운':['dark','moody','무드'],'햇살':['sunlight','sunny','daylight','햇빛','채광'],
+  '책상':['desk','workspace','작업'],'소파':['sofa','couch'],'수납장':['storage','cabinet','drawer','서랍'],'책장':['bookshelf','shelf','선반'],'옷장':['closet','wardrobe'],'거울':['mirror'],
+  '커튼':['curtain','curtains'],'큰창문':['window','big window','창문','창'],'침대프레임':['bed frame','bed','침대'],'넓은':['spacious','large','big'],'좁은':['small','narrow','compact']
+};
+const MAX_EDGE = 1600, THUMB_EDGE = 420;
+
+/* ================= 저장소 ================= */
+const DB = (() => {
+  let p = null;
+  const open = () => p || (p = new Promise(res => { try{ const r = indexedDB.open('room-search-pool', 1); r.onupgradeneeded = () => r.result.createObjectStore('photos', {keyPath:'id'}); r.onsuccess = () => res(r.result); r.onerror = () => res(null); }catch(e){ res(null); } }));
+  const tx = async (mode, fn) => { const db = await open(); if (!db) return null; return new Promise(res => { try{ const t = db.transaction('photos', mode), st = t.objectStore('photos'); const out = fn(st); t.oncomplete = () => res(out && out.result !== undefined ? out.result : out); t.onerror = () => res(null); }catch(e){ res(null); } }); };
+  return {
+    all: () => tx('readonly', st => st.getAll()),
+    put: rec => tx('readwrite', st => st.put(rec)),
+    del: id => tx('readwrite', st => st.delete(id)),
+    clear: () => tx('readwrite', st => st.clear())
+  };
+})();
+const LS = { get(k,d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
+
+/* ================= 상태 ================= */
+const S = {
+  photos: [],                 // {id, name, tags[], contains[], blob, thumb, addedAt}
+  urls: {},                   // id -> {full, thumb}
+  selected: new Set(),
+  filter: 'all',
+  tab: 'pool',
+  settings: Object.assign({targets:['plant','rug','lamp','art','warm'], taskMin:15, minCand:4}, LS.get('rs_settings', {})),
+  sessions: LS.get('rs_sessions', []),
+  session: null,
+  results: [], resultLimit: 24, lastQuery: '', resultMeta: null
+};
+const saveSettings = () => LS.set('rs_settings', S.settings);
+const saveSessions = () => LS.set('rs_sessions', S.sessions);
+
+/* ================= 유틸 ================= */
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s ?? '').toLowerCase().replace(/\s+/g,'');
+const fmt = ms => { const s = Math.max(0, Math.round(ms/1000)); return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; };
+const uid = () => 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+function toast(m){ const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 3000); }
+function download(name, data, type='application/json'){ const b = data instanceof Blob ? data : new Blob([data], {type}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); }
+function parseCSV(text){
+  const rows = []; let row = [], cur = '', q = false;
+  for (let i = 0; i < text.length; i++){ const c = text[i];
+    if (q){ if (c === '"'){ if (text[i+1] === '"'){ cur += '"'; i++; } else q = false; } else cur += c; }
+    else if (c === '"') q = true; else if (c === ','){ row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r'){ if (c === '\r' && text[i+1] === '\n') i++; row.push(cur); rows.push(row); row = []; cur = ''; }
+    else cur += c; }
+  if (cur !== '' || row.length){ row.push(cur); rows.push(row); }
+  const clean = rows.filter(r => r.some(x => x.trim() !== '')); if (!clean.length) return [];
+  const head = clean[0].map(h => h.trim().replace(/^﻿/,''));
+  return clean.slice(1).map(r => Object.fromEntries(head.map((h,i) => [h, (r[i] ?? '').trim()])));
+}
+const csvCell = v => { const s = Array.isArray(v) ? v.join(';') : String(v ?? ''); return /[",\n;]/.test(s) && !Array.isArray(v) ? `"${s.replace(/"/g,'""')}"` : (/[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s); };
+function hash(str){ let h = 2166136261; for (let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+const targetIdsFrom = s => (s||'').split(/[;|,]/).map(x => x.trim()).filter(Boolean).map(x => { const t = TARGETS.find(t => t.id === x || t.name === x || norm(t.name) === norm(x)); return t ? t.id : null; }).filter(Boolean);
+
+/* 이미지 축소 저장 */
+async function shrink(file, edge){
+  const bmp = await createImageBitmap(file).catch(() => null);
+  if (!bmp) return null;
+  const k = Math.min(1, edge / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas'); c.width = Math.round(bmp.width*k); c.height = Math.round(bmp.height*k);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  return new Promise(res => c.toBlob(b => res(b), 'image/jpeg', edge === THUMB_EDGE ? .8 : .86));
+}
+function urlFor(p, kind){
+  if (!S.urls[p.id]) S.urls[p.id] = {};
+  if (!S.urls[p.id][kind]) S.urls[p.id][kind] = URL.createObjectURL(kind === 'thumb' ? (p.thumb || p.blob) : p.blob);
+  return S.urls[p.id][kind];
+}
+async function loadPhotos(){ S.photos = ((await DB.all()) || []).sort((a,b) => a.addedAt - b.addedAt); }
+
+/* ================= 검색 색인 ================= */
+function searchIndex(p){
+  const out = new Set();
+  p.tags.forEach(t => { out.add(t.toLowerCase()); (SYN[t] || []).forEach(s => out.add(s.toLowerCase())); });
+  return [...out];
+}
+const isExcluded = () => false; // 풀은 처음부터 요소 없는 사진으로 채우므로 제외 기능을 쓰지 않음
+const usable = () => S.photos.filter(p => !isExcluded(p));
+function tokenize(q){
+  const neg = [], pos = [];
+  const rest = q.toLowerCase().replace(/(\S+?)\s*(없는|없이|빼고|제외|말고)/g, (_, w) => { neg.push(w); return ' '; });
+  rest.split(/[\s,]+/).filter(Boolean).forEach(t => {
+    if (t.startsWith('-') && t.length > 1){ neg.push(t.slice(1)); return; }
+    pos.push(t);
+    const stem = t.replace(/(한|인|의|을|를|이|가|은|는|에|로|으로|같은|느낌|스타일|분위기|있는)$/,'');
+    if (stem && stem !== t && stem.length >= 2) pos.push(stem);
+  });
+  return {pos:[...new Set(pos)], neg:[...new Set(neg)]};
+}
+function runSearch(q, seed){
+  const {pos, neg} = tokenize(q);
+  const scored = usable().map(p => {
+    const idx = searchIndex(p);
+    const match = t => idx.some(g => g.includes(t) || (t.length >= 2 && g.length >= 2 && t.includes(g)));
+    if (neg.some(match)) return null;
+    return {p, score: pos.reduce((a,t) => a + (match(t) ? 1 : 0), 0), tie: hash(seed + q + p.id)};
+  }).filter(Boolean);
+  const hits = scored.filter(x => x.score > 0).sort((a,b) => b.score - a.score || a.tie - b.tie);
+  let list = hits, padded = false;
+  if (hits.length < 12){ padded = true; list = hits.concat(scored.filter(x => x.score === 0).sort((a,b) => a.tie - b.tie).slice(0, 24 - hits.length)); }
+  const targetTerms = TARGETS.filter(t => S.settings.targets.includes(t.id) && t.kw.some(k => norm(q).includes(norm(k)))).map(t => t.id);
+  return {list: list.map(x => x.p), hits: hits.length, padded, pos, neg, targetTerms};
+}
+
+/* ================= 렌더 ================= */
+function render(){
+  P.active = S.mode === 'search'; savePick();
+  if (S.mode === 'search') return renderSearchUI();
+  document.body.classList.remove('search-mode');
+  $('#brand').textContent = '방 사진 검색 · 연구자';
+  const inProgress = !!P.pid && !P.final;
+  $('#topright').innerHTML = `<div class="row">${inProgress ? `<button class="btn sm" id="resume" type="button">${esc(P.pid)} 이어서 진행</button>` : ''}<button class="btn primary sm" id="open-search" type="button">새 참여자 시작</button></div>`;
+  $('#open-search').onclick = askParticipantId;
+  const rs = $('#resume'); if (rs) rs.onclick = () => { S.mode = 'search'; render(); };
+  const tab = S.rtab || 'pool';
+  $('#main').innerHTML = `<div class="stack"><div class="research-strip">연구자 화면 · "새 참여자 시작"에서 참여자 ID를 넣으면 검색 화면으로 넘어갑니다</div>
+    <div class="tabs" role="tablist"><button role="tab" data-rtab="pool" aria-selected="${tab==='pool'}">사진 풀 관리</button><button role="tab" data-rtab="archive" aria-selected="${tab==='archive'}">참여자 기록 <span class="mono">${ARCH.length}</span></button></div>
+    <div id="body"></div></div>`;
+  $$('[data-rtab]').forEach(b => b.onclick = () => { S.rtab = b.dataset.rtab; render(); });
+  if (tab === 'archive') renderArchive(); else renderPool();
+}
+
+/* ---------- 사진 풀 관리 ---------- */
+function renderPool(){
+  const ex = S.photos.filter(isExcluded).length, untagged = S.photos.filter(p => !p.tags.length).length;
+  $('#body').innerHTML = `
+    <div class="manager">
+      <div class="stack">
+        <div class="card stack">
+          <div class="stats"><div><b>${S.photos.length}</b>전체 사진</div><div><b style="color:var(--research)">${untagged}</b>태그 없음</div></div>
+          <div class="drop" id="drop">
+            <p><b>방 사진을 여기로 끌어다 놓으세요</b></p>
+            <p class="small">여러 장, 폴더째 가능 · 큰 사진은 1600px로 줄여 이 브라우저에 저장합니다 · 사진을 누르면 태그를 고칠 수 있어요</p>
+            <div class="row" style="justify-content:center;margin-top:10px">
+              <label class="btn sm" for="f-files" style="cursor:pointer">사진 고르기</label><input type="file" id="f-files" accept="image/*,.csv" multiple hidden>
+              <label class="btn sm" for="f-dir" style="cursor:pointer">폴더 고르기</label><input type="file" id="f-dir" webkitdirectory multiple hidden>
+            </div>
+            <div class="prog-bar" id="prog" hidden style="margin-top:12px"><i style="width:0"></i></div>
+          </div>
+          <div class="row between">
+            <div class="row">
+              <select id="flt" style="width:auto"><option value="all">전체 보기</option><option value="untagged">태그 없는 사진</option></select>
+              <button class="btn sm ghost" id="sel-all">보이는 것 모두 선택</button><button class="btn sm ghost" id="sel-none">선택 해제</button>
+              <button class="btn sm danger" id="del-sel" disabled>선택한 사진 삭제</button><button class="btn sm danger" id="del-all" ${S.photos.length ? '' : 'disabled'}>전체 삭제</button>
+            </div>
+            <div class="row"><button class="btn sm" id="exp">풀 내보내기 (ZIP)</button><label class="btn sm" for="imp" style="cursor:pointer">풀 불러오기</label><input type="file" id="imp" accept=".zip" hidden></div>
+          </div>
+        </div>
+        <div class="pgrid" id="pgrid"></div>
+      </div>
+      <aside class="editor card" id="editor"></aside>
+    </div>`;
+  $('#flt').value = S.filter;
+  $('#flt').onchange = e => { S.filter = e.target.value; drawGrid(); };
+  $('#sel-all').onclick = () => { visible().forEach(p => S.selected.add(p.id)); drawGrid(); drawEditor(); };
+  $('#sel-none').onclick = () => { S.selected.clear(); drawGrid(); drawEditor(); };
+  $('#f-files').onchange = e => addFiles(e.target.files);
+  $('#f-dir').onchange = e => addFiles(e.target.files);
+  $('#exp').onclick = exportPool;
+  $('#del-sel').onclick = () => confirmDelete($('#del-sel'), S.photos.filter(p => S.selected.has(p.id)));
+  $('#del-all').onclick = () => confirmDelete($('#del-all'), S.photos.slice());
+  $('#imp').onchange = e => importPool(e.target.files[0]);
+  const drop = $('#drop');
+  ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', async e => { const files = await filesFromDrop(e.dataTransfer); addFiles(files); });
+  drawGrid(); drawEditor();
+}
+async function confirmDelete(btn, list){
+  if (!list.length) return;
+  if (!btn.dataset.sure){
+    btn.dataset.sure = 1; const label = btn.textContent;
+    btn.textContent = `${list.length}장을 지웁니다 · 한 번 더 누르기`;
+    setTimeout(() => { if (btn.isConnected){ delete btn.dataset.sure; btn.textContent = label; } }, 4000);
+    return;
+  }
+  const ids = new Set(list.map(p => p.id));
+  if (ids.size === S.photos.length) await DB.clear(); else for (const id of ids) await DB.del(id);
+  ids.forEach(id => { const u = S.urls[id]; if (u){ Object.values(u).forEach(x => URL.revokeObjectURL(x)); delete S.urls[id]; } });
+  S.photos = S.photos.filter(p => !ids.has(p.id)); S.selected.clear();
+  toast(`${ids.size}장을 삭제했습니다`); renderPool();
+}
+function syncDeleteButtons(){
+  const ds = $('#del-sel'), da = $('#del-all');
+  if (ds && !ds.dataset.sure){ ds.disabled = !S.selected.size; ds.textContent = S.selected.size ? `선택한 ${S.selected.size}장 삭제` : '선택한 사진 삭제'; }
+  if (da && !da.dataset.sure) da.disabled = !S.photos.length;
+}
+function visible(){
+  return S.photos.filter(p => S.filter === 'all' || (S.filter === 'untagged' && !p.tags.length) || (S.filter === 'excluded' && isExcluded(p)) || (S.filter === 'usable' && !isExcluded(p)));
+}
+function drawGrid(){
+  const g = $('#pgrid'); if (!g) return;
+  const list = visible();
+  if (!S.photos.length){ g.innerHTML = '<div class="empty card" style="grid-column:1/-1">아직 사진이 없습니다. 팀이 찾은 방 사진을 위에 추가하세요.<br><span class="small">Unsplash 등에서 내려받은 침실·원룸 사진 150~250장을 권장합니다.</span></div>'; return; }
+  g.innerHTML = list.map(p => `<button class="pitem" data-id="${p.id}" aria-pressed="${S.selected.has(p.id)}">
+    <img loading="lazy" alt="${esc(p.name)}" src="${urlFor(p,'thumb')}">
+    ${isExcluded(p) ? `<span class="flag ex">제외 · ${p.contains.map(id => TARGETS.find(t => t.id === id).name).join(', ')}</span>` : (!p.tags.length ? '<span class="flag none">태그 없음</span>' : '')}
+    <div class="meta">${p.tags.length ? esc(p.tags.join(' · ')) : esc(p.name)}</div></button>`).join('') || '<p class="muted" style="grid-column:1/-1">조건에 맞는 사진이 없습니다.</p>';
+  let last = null;
+  $$('.pitem', g).forEach(b => b.onclick = e => {
+    const id = b.dataset.id;
+    if (e.shiftKey && last){ const ids = list.map(p => p.id); const [a, z] = [ids.indexOf(last), ids.indexOf(id)].sort((x,y) => x-y); ids.slice(a, z+1).forEach(x => S.selected.add(x)); }
+    else if (e.metaKey || e.ctrlKey){ S.selected.has(id) ? S.selected.delete(id) : S.selected.add(id); }
+    else if (S.selected.has(id) && S.selected.size === 1) S.selected.clear();
+    else { S.selected.clear(); S.selected.add(id); }
+    last = id; drawGrid(); drawEditor();
+  });
+}
+function drawEditor(){
+  const ed = $('#editor'); if (!ed) return;
+  syncDeleteButtons();
+  const sel = S.photos.filter(p => S.selected.has(p.id));
+  const state = (has) => { const n = sel.filter(has).length; return n === 0 ? 'false' : n === sel.length ? 'true' : 'mixed'; };
+  ed.hidden = !sel.length;
+  $('.manager').classList.toggle('solo', !sel.length);
+  if (!sel.length){ ed.innerHTML = ''; return; }
+  const one = sel.length === 1 ? sel[0] : null;
+  const allTags = [...new Set(sel.flatMap(p => p.tags))];
+  const presets = new Set(TAG_GROUPS.flatMap(g => g.tags));
+  const custom = allTags.filter(t => !presets.has(t));
+  ed.innerHTML = `
+    <div class="row between"><h3>${sel.length}장 선택</h3><button class="btn sm ghost" id="ed-close">닫기</button></div>
+    ${one ? `<img src="${urlFor(one,'thumb')}" alt="" style="width:100%;border-radius:8px"><p class="small muted mono" style="word-break:break-all">${esc(one.name)}</p>` : ''}
+    ${TAG_GROUPS.map(g => `<div class="taggroup"><span>${g.name}</span><div class="tagbtns">${g.tags.map(t => `<button class="tagbtn" data-tag="${esc(t)}" aria-pressed="${state(p => p.tags.includes(t))}">${esc(t)}</button>`).join('')}</div></div>`).join('')}
+    <div class="taggroup"><span>직접 입력한 태그</span><div class="tagbtns">${custom.map(t => `<button class="tagbtn" data-tag="${esc(t)}" aria-pressed="${state(p => p.tags.includes(t))}">${esc(t)}</button>`).join('') || '<span class="small muted">없음</span>'}</div>
+      <div class="row"><input type="text" id="ed-new" placeholder="새 태그 (쉼표로 여러 개)" style="flex:1;width:auto"><button class="btn sm" id="ed-add">추가</button></div></div>
+    <p class="small muted">태그를 누르면 선택한 사진 모두에 붙이거나 뗍니다. 영어 검색어(cozy, white 등)는 자동으로 연결됩니다.</p>
+    <div class="row between"><button class="btn sm danger" id="ed-del">선택한 사진 삭제</button>${one ? `<span class="small muted">${S.photos.indexOf(one)+1} / ${S.photos.length}</span>` : ''}</div>
+    ${one ? `<div class="row"><button class="btn sm" id="ed-prev">← 이전 사진</button><button class="btn sm" id="ed-next">다음 사진 →</button></div>` : ''}`;
+  const apply = async (fn) => { for (const p of sel){ fn(p); await DB.put(p); } drawGrid(); drawEditor(); refreshStats(); };
+  $$('[data-tag]', ed).forEach(b => b.onclick = () => { const t = b.dataset.tag, on = b.getAttribute('aria-pressed') !== 'true'; apply(p => { p.tags = on ? [...new Set([...p.tags, t])] : p.tags.filter(x => x !== t); }); });
+  $$('[data-c]', ed).forEach(b => b.onclick = () => { const c = b.dataset.c, on = b.getAttribute('aria-pressed') !== 'true'; apply(p => { p.contains = on ? [...new Set([...p.contains, c])] : p.contains.filter(x => x !== c); }); });
+  const addNew = () => { const ts = $('#ed-new').value.split(',').map(x => x.trim()).filter(Boolean); if (!ts.length) return; apply(p => { p.tags = [...new Set([...p.tags, ...ts])]; }); };
+  $('#ed-add').onclick = addNew; $('#ed-new').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing){ e.preventDefault(); addNew(); } };
+  $('#ed-close').onclick = () => { S.selected.clear(); drawGrid(); drawEditor(); };
+  $('#ed-del').onclick = () => confirmDelete($('#ed-del'), sel);
+  if (one){
+    const step = d => { const list = visible(); const i = list.findIndex(p => p.id === one.id); const n = list[i + d]; if (n){ S.selected.clear(); S.selected.add(n.id); drawGrid(); drawEditor(); const el = $(`.pitem[data-id="${n.id}"]`); el && el.scrollIntoView({block:'nearest'}); } };
+    $('#ed-prev').onclick = () => step(-1); $('#ed-next').onclick = () => step(1);
+  }
+}
+function refreshStats(){
+  const ex = S.photos.filter(isExcluded).length, untagged = S.photos.filter(p => !p.tags.length).length;
+  const b = $$('.stats b'); if (b.length === 2){ b[0].textContent = S.photos.length; b[1].textContent = untagged; }
+}
+document.addEventListener('keydown', e => {
+  if (S.mode === 'search' || !S.selected.size || /input|textarea|select/i.test(document.activeElement.tagName)) return;
+  if (e.key === 'Delete' || e.key === 'Backspace'){ const b = $('#del-sel'); b && !b.disabled && b.click(); }
+  if (e.key === 'ArrowRight') $('#ed-next') && $('#ed-next').click();
+  if (e.key === 'ArrowLeft') $('#ed-prev') && $('#ed-prev').click();
+});
+async function filesFromDrop(dt){
+  const out = [];
+  const walk = (entry) => new Promise(res => {
+    if (entry.isFile) entry.file(f => { out.push(f); res(); }, () => res());
+    else if (entry.isDirectory){ const r = entry.createReader(); const readAll = () => r.readEntries(async ents => { if (!ents.length) return res(); for (const en of ents) await walk(en); readAll(); }, () => res()); readAll(); }
+    else res();
+  });
+  const items = Array.from(dt.items || []).map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  if (items.length){ for (const it of items) await walk(it); return out; }
+  return Array.from(dt.files || []);
+}
+async function addFiles(fileList, meta){
+  const files = Array.from(fileList || []);
+  const csv = files.find(f => /\.csv$/i.test(f.name));
+  const rows = meta || (csv ? parseCSV(await csv.text()) : []);
+  const nfc = x => String(x || '').normalize('NFC');
+  const byName = new Map(rows.map(r => [nfc((r.file || '').split('/').pop()), r]));
+  const imgs = files.filter(f => /^image\//.test(f.type) || /\.(jpe?g|png|webp|gif|avif|heic)$/i.test(f.name));
+  if (!imgs.length){ toast('추가할 사진이 없습니다'); return; }
+  const existing = new Set(S.photos.map(p => p.name.normalize('NFC')));
+  const prog = $('#prog'); if (prog) prog.hidden = false;
+  let added = 0, skipped = 0, failed = 0;
+  for (let i = 0; i < imgs.length; i++){
+    const f = imgs[i];
+    if (existing.has(nfc(f.name))){ skipped++; continue; }
+    const [blob, thumb] = await Promise.all([shrink(f, MAX_EDGE), shrink(f, THUMB_EDGE)]);
+    if (!blob){ failed++; continue; }
+    const r = byName.get(nfc(f.name)) || byName.get(nfc(f.name).replace(/\.[^.]+$/, '.jpg')) || {};
+    const rec = {id:uid(), name:nfc(f.name), tags:(r.tags||'').split(/[;|]/).map(t => t.trim()).filter(Boolean), contains:targetIdsFrom(r.contains), blob, thumb, addedAt:Date.now() + i};
+    await DB.put(rec); S.photos.push(rec); existing.add(nfc(f.name)); added++;
+    if (prog) prog.firstElementChild.style.width = ((i+1)/imgs.length*100) + '%';
+  }
+  toast(`${added}장 추가${skipped ? ` · 같은 이름 ${skipped}장 건너뜀` : ''}${failed ? ` · 읽지 못한 파일 ${failed}장 (HEIC는 JPG로 바꿔 주세요)` : ''}`);
+  renderPool();
+}
+async function exportPool(){
+  if (!S.photos.length){ toast('내보낼 사진이 없습니다'); return; }
+  const csv = '﻿file,tags,contains\n' + S.photos.map(p => [p.name, p.tags.join(';'), p.contains.map(id => TARGETS.find(t => t.id === id).name).join(';')].map(v => /[",\n]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v).join(',')).join('\n');
+  if (typeof JSZip === 'undefined'){ download('pool.csv', csv, 'text/csv'); toast('인터넷 연결이 없어 태그 목록(pool.csv)만 저장했습니다'); return; }
+  toast('ZIP을 만드는 중…');
+  const zip = new JSZip(); zip.file('pool.csv', csv);
+  S.photos.forEach(p => zip.file('photos/' + p.name.replace(/\.[^.]+$/, '') + '.jpg', p.blob));
+  download(`room_pool_${new Date().toISOString().slice(0,10)}.zip`, await zip.generateAsync({type:'blob'}), 'application/zip');
+}
+async function importPool(file){
+  if (!file) return;
+  if (typeof JSZip === 'undefined'){ toast('ZIP을 열려면 인터넷 연결이 필요합니다. 폴더째 추가해 주세요'); return; }
+  const zip = await JSZip.loadAsync(file).catch(() => null); if (!zip){ toast('ZIP 파일을 열 수 없습니다'); return; }
+  const csvEntry = Object.values(zip.files).find(f => /pool\.csv$/i.test(f.name));
+  const rows = csvEntry ? parseCSV(await csvEntry.async('string')) : [];
+  const meta = rows.map(r => Object.assign({}, r, {file: (r.file||'').replace(/\.[^.]+$/, '') + '.jpg'})).concat(rows);
+  const files = [];
+  for (const f of Object.values(zip.files)){ if (f.dir || !/\.(jpe?g|png|webp)$/i.test(f.name)) continue; const b = await f.async('blob'); files.push(new File([b], f.name.split('/').pop(), {type:'image/jpeg'})); }
+  addFiles(files, meta);
+}
+
+/* ---------- 참여자 검색 화면 ---------- */
+const photoById = id => S.photos.find(p => p.id === id);
+// 참여자 진행 상태: 마음에 든 사진, 최종 사진, 지금 보는 화면 (새로고침해도 유지)
+const PICK_KEY = 'rs_pick';
+const P = Object.assign({liked: [], final: null, view: 'search', startedAt: null, finishedAt: null}, LS.get(PICK_KEY, {}));
+const savePick = () => LS.set(PICK_KEY, P);
+const isLiked = id => P.liked.includes(id);
+function toggleLike(id){
+  if (P.final) return;
+  const i = P.liked.indexOf(id);
+  const qs = P.queries || [], qn = qs.length;
+  const where = P.view === 'saved' ? '모아 보기' : (document.querySelector('.modal') ? '크게 보기' : '검색 결과');
+  (P.likeLog = P.likeLog || []).push({action: i >= 0 ? '빼기' : '담기', id, at: new Date().toISOString(), qn, q: qn ? qs[qn - 1].q : '', where});
+  if (i >= 0) P.liked.splice(i, 1); else P.liked.push(id);
+  if (!P.startedAt) P.startedAt = new Date().toISOString();
+  savePick(); syncLikes();
+}
+const HEART = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.5 8.1 3.6 5 6.8 5c2 0 3.4 1.1 4.2 2.4h2C13.8 6.1 15.2 5 17.2 5c3.2 0 5.3 3.1 4.1 6.3-1.8 4.6-9.3 9.2-9.3 9.2z" fill="currentColor"/></svg>';
+function syncLikes(){
+  $$('[data-like]').forEach(b => { const on = isLiked(b.dataset.like); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.setAttribute('aria-label', on ? '마음에 든 사진에서 빼기' : '마음에 든 사진에 담기'); });
+  $$('.g-saved-count').forEach(n => n.textContent = P.liked.length);
+  $$('.g-saved').forEach(n => n.classList.toggle('has', P.liked.length > 0));
+  $$('[data-like-label]').forEach(n => n.textContent = isLiked(n.dataset.likeLabel) ? '마음에 든 사진에 담김' : '마음에 들어요');
+}
+const savedBtn = () => `<button class="g-saved ${P.liked.length ? 'has' : ''}" id="to-saved" type="button">${HEART}<span>마음에 든 사진</span><b class="g-saved-count">${P.liked.length}</b></button>`;
+function tile(p, mode){
+  return `<div class="g-item${mode==='pick' && P._sel===p.id ? ' sel' : ''}" data-id="${p.id}">
+    <button class="g-open" type="button" aria-label="${mode==='pick' ? '이 사진 고르기' : '크게 보기'}"><img loading="lazy" alt="방 사진" src="${urlFor(p,'thumb')}"></button>
+    ${mode==='pick' ? `<button class="g-zoom" type="button" data-zoom="${p.id}" aria-label="크게 보기"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M10.5 4a6.5 6.5 0 0 1 5.2 10.4l4.4 4.4-1.4 1.4-4.4-4.4A6.5 6.5 0 1 1 10.5 4zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z" fill="currentColor"/></svg></button><span class="g-check" aria-hidden="true">✓</span>` : ''}
+    <button class="g-like${isLiked(p.id) ? ' on' : ''}" type="button" data-like="${p.id}" aria-pressed="${isLiked(p.id)}">${HEART}</button>
+  </div>`;
+}
+function fitTiles(box){
+  $$('.g-item', box).forEach(t => { const img = t.querySelector('img'); const fit = () => { if (img.naturalWidth) t.style.flexBasis = Math.round(190 * img.naturalWidth / img.naturalHeight) + 'px'; }; img.complete ? fit() : img.addEventListener('load', fit); });
+}
+function bindLikeButtons(root){ $$('[data-like]', root).forEach(b => b.onclick = e => { e.stopPropagation(); toggleLike(b.dataset.like); if (P.view === 'saved') renderSearchUI(); }); }
+
+function renderSearchUI(){
+  document.body.classList.add('search-mode');
+  $('#brand').textContent = ''; $('#topright').innerHTML = '';
+  if (P.final) return renderDoneUI();
+  if (P.view === 'saved') return renderSavedUI();
+  if (!S.lastQuery){
+    $('#main').innerHTML = `<div class="g-bar g-bar-home">${savedBtn()}</div><div class="g-home">
+      <form class="g-form" id="gform" role="search"><input type="search" id="q" aria-label="검색어" autocomplete="off"><button class="g-btn">검색</button></form></div>`;
+  } else {
+    $('#main').innerHTML = `<div class="g-top">
+      <form class="g-form" id="gform" role="search"><input type="search" id="q" aria-label="검색어" autocomplete="off" value="${esc(S.lastQuery)}"><button class="g-btn">검색</button></form>${savedBtn()}</div>
+      <div class="g-grid" id="results"></div>
+      <div class="row" style="justify-content:center;margin-top:20px"><button class="btn" id="more" hidden>결과 더 보기</button></div>`;
+    $('#more').onclick = () => { S.resultLimit += 30; drawResults(); };
+    drawResults();
+  }
+  $('#to-saved').onclick = () => { P.view = 'saved'; P._sel = null; savePick(); renderSearchUI(); window.scrollTo(0,0); };
+  $('#gform').onsubmit = e => { e.preventDefault(); const q = $('#q').value.trim(); if (!q) return; if (!P.final){ (P.queries = P.queries || []).push({q, at: new Date().toISOString()}); if (!P.startedAt) P.startedAt = new Date().toISOString(); savePick(); } S.lastQuery = q; S.resultLimit = 30; S.results = runSearch(q, 'pilot').list; renderSearchUI(); window.scrollTo(0,0); };
+  if (!S.lastQuery) $('#q').focus();
+}
+function drawResults(){
+  const box = $('#results'); if (!box) return;
+  const shown = S.results.slice(0, S.resultLimit);
+  if (!shown.length){ box.innerHTML = '<p class="muted" style="padding:40px 0">검색 결과가 없습니다.</p>'; $('#more').hidden = true; return; }
+  box.innerHTML = shown.map(p => tile(p, 'search')).join('') + '<span class="g-fill"></span>';
+  fitTiles(box); bindLikeButtons(box);
+  $$('.g-item', box).forEach(t => t.querySelector('.g-open').onclick = () => openPreview(t.dataset.id, shown));
+  $('#more').hidden = S.results.length <= S.resultLimit;
+}
+
+function renderSavedUI(){
+  const list = P.liked.map(photoById).filter(Boolean);
+  if (P._sel && !P.liked.includes(P._sel)) P._sel = null;
+  $('#main').innerHTML = `<div class="g-top">
+      <button class="btn" id="back" type="button">← 검색으로 돌아가기</button>
+      <h1 class="g-title">마음에 든 사진 <span class="mono">${list.length}</span></h1></div>
+    ${list.length ? `<p class="muted g-guide">이 중에서 다음에 혼자 지낼 방으로 가장 마음에 드는 사진 한 장을 골라 주세요. 하트를 누르면 목록에서 빠져요.</p>
+      <div class="g-grid g-pick" id="saved">${list.map(p => tile(p, 'pick')).join('')}<span class="g-fill"></span></div>
+      <div class="g-decide"><span class="muted" id="sel-hint">${P._sel ? '고른 사진: 1장' : '사진을 눌러 한 장을 고르세요'}</span><button class="g-btn" id="decide" type="button" ${P._sel ? '' : 'disabled'}>이 사진으로 결정</button></div>`
+    : `<div class="empty">아직 담은 사진이 없어요.<br>검색 결과에서 하트를 눌러 마음에 드는 사진을 담아 보세요.</div>`}`;
+  $('#back').onclick = () => { P.view = 'search'; savePick(); renderSearchUI(); };
+  const box = $('#saved'); if (!box) return;
+  fitTiles(box); bindLikeButtons(box);
+  $$('.g-item', box).forEach(t => {
+    t.querySelector('.g-open').onclick = () => { P._sel = t.dataset.id; savePick(); $$('.g-item', box).forEach(x => x.classList.toggle('sel', x === t)); $('#decide').disabled = false; $('#sel-hint').textContent = '고른 사진: 1장'; };
+  });
+  $$('[data-zoom]', box).forEach(b => b.onclick = e => { e.stopPropagation(); openPreview(b.dataset.zoom, list, true); });
+  $('#decide').onclick = confirmFinal;
+}
+function confirmFinal(){
+  const p = photoById(P._sel); if (!p) return;
+  const m = document.createElement('div'); m.className = 'modal';
+  m.innerHTML = `<div class="panel g-confirm" role="dialog" aria-modal="true" aria-label="최종 선택 확인">
+    <img alt="고른 사진" src="${urlFor(p,'full')}">
+    <h2>이 사진으로 결정할까요?</h2><p class="muted">결정하면 다시 바꿀 수 없어요.</p>
+    <div class="row" style="justify-content:flex-end"><button class="btn" data-close type="button">다시 고르기</button><button class="g-btn" id="ok" type="button">결정</button></div></div>`;
+  m.onclick = e => { if (e.target === m || e.target.dataset.close != null) m.remove(); };
+  $('#ok', m).onclick = () => { P.final = p.id; P.finishedAt = new Date().toISOString(); archiveCurrent('완료'); savePick(); m.remove(); renderSearchUI(); window.scrollTo(0,0); };
+  document.body.appendChild(m);
+}
+function renderDoneUI(){
+  const p = photoById(P.final);
+  $('#main').innerHTML = `<div class="g-done">
+    <p class="g-done-kicker">선택을 마쳤습니다</p>
+    <h1>다음에 혼자 지낼 방으로 고른 사진</h1>
+    ${p ? `<img alt="최종으로 고른 사진" src="${urlFor(p,'full')}">` : '<p class="muted">사진을 찾을 수 없습니다.</p>'}
+    <button class="g-notify" id="to-manager" type="button">연구자에게 알려 주세요.</button></div>`;
+  $('#to-manager').onclick = () => { S.mode = null; render(); window.scrollTo(0,0); };
+}
+
+function openPreview(id, list, fromSaved){
+  const p = photoById(id); if (!p) return;
+  const i = list.findIndex(x => x.id === id);
+  const m = document.createElement('div'); m.className = 'modal';
+  m.innerHTML = `<div class="panel" role="dialog" aria-modal="true" aria-label="이미지 크게 보기">
+    <img alt="방 사진" src="${urlFor(p,'full')}">
+    <div class="row between"><div class="row"><button class="btn sm" data-nav="-1" ${i <= 0 ? 'disabled' : ''}>← 이전</button><button class="btn sm" data-nav="1" ${i >= list.length - 1 ? 'disabled' : ''}>다음 →</button></div>
+    <div class="row"><button class="btn" data-close type="button">닫기</button>${fromSaved ? `<button class="g-btn" id="pick-this" type="button">이 사진 고르기</button>` : `<button class="g-like-btn${isLiked(id) ? ' on' : ''}" type="button" data-like="${id}" aria-pressed="${isLiked(id)}">${HEART}<span data-like-label="${id}">${isLiked(id) ? '마음에 든 사진에 담김' : '마음에 들어요'}</span></button>`}</div></div></div>`;
+  const close = () => { m.remove(); document.removeEventListener('keydown', onKey); };
+  const go = d => { const n = list[i + d]; if (n){ close(); openPreview(n.id, list, fromSaved); } };
+  const onKey = e => { if (e.key === 'Escape') close(); if (e.key === 'ArrowRight') go(1); if (e.key === 'ArrowLeft') go(-1); };
+  m.onclick = e => { if (e.target === m || e.target.dataset.close != null) close(); };
+  $$('[data-nav]', m).forEach(b => b.onclick = () => go(Number(b.dataset.nav)));
+  $$('[data-like]', m).forEach(b => b.onclick = () => toggleLike(id));
+  const pk = $('#pick-this', m); if (pk) pk.onclick = () => { P._sel = id; savePick(); close(); renderSearchUI(); };
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(m);
+}
+
+/* 연구자 화면: 최근 참여자 결과 */
+function resetSession(){ if (!P.archivedId && P.liked.length) archiveCurrent('미완료'); P.archivedId = null; P.pid = null; P.queries = []; P.likeLog = []; P.liked = []; P.final = null; P._sel = null; P.view = 'search'; P.startedAt = null; P.finishedAt = null; savePick(); S.lastQuery = ''; S.results = []; }
+
+
+function askParticipantId(){
+  const m = document.createElement('div'); m.className = 'modal';
+  const warn = P.pid && !P.final && P.liked.length;
+  m.innerHTML = `<form class="panel g-confirm" id="pid-form" role="dialog" aria-modal="true" aria-label="참여자 ID 입력">
+    <h2>참여자 ID</h2>
+    <input type="text" id="pid-in" placeholder="예: P03" autocomplete="off" required>
+    ${warn ? `<p class="small" style="color:var(--research)">${esc(P.pid)}의 진행 중 결과(담은 사진 ${P.liked.length}장)는 "미완료"로 기록됩니다.</p>` : ''}
+    <div class="row" style="justify-content:flex-end"><button class="btn" data-close type="button">취소</button><button class="g-btn" type="submit">검색 화면으로</button></div></form>`;
+  m.onclick = e => { if (e.target === m || e.target.dataset.close != null) m.remove(); };
+  document.body.appendChild(m);
+  const inp = $('#pid-in', m); inp.focus();
+  $('#pid-form', m).onsubmit = e => {
+    e.preventDefault(); const id = inp.value.trim(); if (!id){ inp.focus(); return; }
+    resetSession(); P.pid = id; savePick(); m.remove(); S.mode = 'search'; render(); window.scrollTo(0,0);
+  };
+}
+
+/* ---------- 참여자 기록 (아카이브) ---------- */
+const ARCH_KEY = 'rs_archive';
+let ARCH = LS.get(ARCH_KEY, []);
+const saveArch = () => LS.set(ARCH_KEY, ARCH);
+const refOf = id => { const p = photoById(id); return {id, name: p ? p.name : id}; };
+const likedRef = id => { const add = (P.likeLog || []).filter(e => e.id === id && e.action === '담기').pop(); return Object.assign(refOf(id), add ? {qn: add.qn, q: add.q, likedAt: add.at} : {}); };
+function archiveCurrent(status){
+  const no = (ARCH.reduce((m, r) => Math.max(m, r.no || 0), 0)) + 1;
+  const rec = {id: 'a' + Date.now().toString(36), no, label: P.pid || '', note: '', status,
+    startedAt: P.startedAt, finishedAt: P.finishedAt || new Date().toISOString(),
+    liked: P.liked.map(likedRef), final: P.final ? refOf(P.final) : null, queries: (P.queries || []).slice(),
+    likeLog: (P.likeLog || []).map(e => Object.assign({}, e, {name: refOf(e.id).name}))};
+  ARCH.push(rec); saveArch(); P.archivedId = rec.id;
+}
+const fmtTime = iso => { if (!iso) return '—'; const d = new Date(iso); return d.toLocaleDateString('ko-KR', {month:'numeric', day:'numeric'}) + ' ' + d.toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'}); };
+const durMin = r => r.startedAt && r.finishedAt ? Math.max(0, Math.round((Date.parse(r.finishedAt) - Date.parse(r.startedAt)) / 60000)) + '분' : '—';
+function thumbHTML(ref, isFinal){
+  const p = photoById(ref.id);
+  return `<figure class="${isFinal ? 'fin' : ''}">${p ? `<img alt="" src="${urlFor(p,'thumb')}">` : `<div class="ph-missing">풀에 없음</div>`}<figcaption>${isFinal ? '최종 · ' : ''}${esc(ref.name)}${ref.qn ? `<span class="q-tag">${ref.qn}번째 검색 · ${esc(ref.q)}</span>` : ''}</figcaption></figure>`;
+}
+function renderArchive(){
+  const list = ARCH.slice().reverse();
+  const done = ARCH.filter(r => r.status === '완료').length;
+  $('#body').innerHTML = `<div class="stack">
+    <div class="row between"><p class="small muted">최종 선택을 마치면 자동으로 기록됩니다. 최종 선택 전에 다음 참여자로 넘어가면 "미완료"로 남습니다. · 완료 <b class="mono">${done}</b> · 전체 <b class="mono">${ARCH.length}</b></p>
+      <div class="row"><button class="btn sm" id="arch-csv" ${ARCH.length ? '' : 'disabled'}>CSV 내보내기</button><button class="btn sm" id="arch-zip" ${ARCH.length ? '' : 'disabled'}>기록 + 최종 사진 (ZIP)</button></div></div>
+    ${list.length ? list.map(r => `<div class="card stack arch" data-arch="${r.id}">
+      <div class="row between">
+        <div class="row"><span class="mono small muted">#${r.no}</span><input type="text" class="arch-label" data-f="label" value="${esc(r.label)}" placeholder="참여자 ID" aria-label="참여자 ID (#${r.no})"><span class="pill ${r.status === '완료' ? 'ok' : 'warn'}">${r.status}</span></div>
+        <div class="row">${r.final && photoById(r.final.id) ? `<a class="btn sm" href="${urlFor(photoById(r.final.id),'full')}" download="P${r.no}_FINAL_${esc(r.final.name.replace(/\.[^.]+$/, ''))}.jpg">최종 사진 저장</a>` : ''}<button class="btn sm danger" data-del="${r.id}" type="button">기록 삭제</button></div>
+      </div>
+      <dl class="kv"><dt>${r.status === '완료' ? '결정 시각' : '기록 시각'}</dt><dd class="mono">${fmtTime(r.finishedAt)} (첫 검색부터 ${durMin(r)})</dd>
+        <dt>검색어 (${(r.queries || []).length}회)</dt><dd>${(r.queries || []).length ? `<ol class="q-list">${r.queries.map(x => `<li><span class="mono small muted">${new Date(x.at).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'})}</span> ${esc(x.q)}</li>`).join('')}</ol>` : '—'}</dd>
+        <dt>마음에 든 사진</dt><dd class="mono">${r.liked.length}장</dd>
+        <dt>최종 사진</dt><dd class="mono" style="word-break:break-all">${r.final ? esc(r.final.name) : '—'}</dd></dl>
+      <div class="g-strip">${r.liked.map(ref => thumbHTML(ref, r.final && ref.id === r.final.id)).join('') || '<p class="small muted">담은 사진 없음</p>'}</div>
+    </div>`).join('') : '<div class="empty card">아직 기록이 없습니다. 참여자가 최종 사진을 고르면 여기에 쌓입니다.</div>'}
+  </div>`;
+  $$('.arch-label').forEach(inp => inp.oninput = () => { const r = ARCH.find(x => x.id === inp.closest('[data-arch]').dataset.arch); if (r){ r.label = inp.value; saveArch(); } });
+  $$('[data-del]').forEach(b => b.onclick = () => {
+    if (!b.dataset.sure){ b.dataset.sure = 1; b.textContent = '한 번 더 누르면 삭제'; setTimeout(() => { if (b.isConnected){ delete b.dataset.sure; b.textContent = '기록 삭제'; } }, 4000); return; }
+    ARCH = ARCH.filter(r => r.id !== b.dataset.del); saveArch(); render();
+  });
+  const csv = $('#arch-csv'); if (csv) csv.onclick = () => download(`search_participants_${new Date().toISOString().slice(0,10)}.csv`, '﻿' + archiveCSV(), 'text/csv');
+  const zp = $('#arch-zip'); if (zp) zp.onclick = exportArchiveZip;
+}
+function archiveCSV(){
+  const cell = v => { const x = String(v ?? ''); return /[",\n]/.test(x) ? `"${x.replace(/"/g,'""')}"` : x; };
+  const head = ['no','participant_id','status','started_at','finished_at','query_count','queries','liked_count','liked_with_query','unliked_count','final_query','liked_files','final_file','final_in_liked_order'];
+  const rows = ARCH.map(r => [r.no, r.label, r.status, r.startedAt || '', r.finishedAt || '', (r.queries || []).length, (r.queries || []).map(x => x.q).join(' | '), r.liked.length, r.liked.map(x => `${x.name}@${x.qn ? x.qn + ':' + x.q : '-'}`).join(' | '), (r.likeLog || []).filter(e => e.action === '빼기').length, (() => { const f = r.final && r.liked.find(x => x.id === r.final.id); return f && f.qn ? `${f.qn}:${f.q}` : ''; })(), r.liked.map(x => x.name).join('|'), r.final ? r.final.name : '', r.final ? r.liked.findIndex(x => x.id === r.final.id) + 1 : '']);
+  return [head.join(','), ...rows.map(r => r.map(cell).join(','))].join('\n');
+}
+async function exportArchiveZip(){
+  if (typeof JSZip === 'undefined'){ toast('ZIP을 만들려면 인터넷 연결이 필요합니다. CSV로 받아 주세요'); return; }
+  toast('ZIP을 만드는 중…');
+  const zip = new JSZip();
+  zip.file('participants.csv', '﻿' + archiveCSV());
+  zip.file('participants.json', JSON.stringify(ARCH, null, 1));
+  for (const r of ARCH){
+    const dir = `P${String(r.no).padStart(2,'0')}${r.label ? '_' + r.label.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 30) : ''}/`;
+    for (const ref of r.liked){ const p = photoById(ref.id); if (p) zip.file(dir + (r.final && ref.id === r.final.id ? 'FINAL_' : 'liked_') + ref.name.replace(/\.[^.]+$/, '') + '.jpg', p.blob); }
+  }
+  download(`search_participants_${new Date().toISOString().slice(0,10)}.zip`, await zip.generateAsync({type:'blob'}), 'application/zip');
+}
+
+/* ---------- 연구자 패널 (검색 화면에서 나가기) ---------- */
+function renderRx(){
+  const p = $('#rx-panel'); if (p.hidden) return;
+  p.innerHTML = `<div class="research-strip">연구자 패널</div>
+    ${S.mode === 'search' ? '<button class="btn sm" id="rx-back">사진 풀 관리로 돌아가기</button>' : '<p class="small muted">검색 화면에서 이 패널로 관리 화면에 돌아옵니다.</p>'}`;
+  const b = $('#rx-back'); if (b) b.onclick = () => { S.mode = null; p.hidden = true; render(); };
+}
+const toggleRx = () => { const p = $('#rx-panel'); p.hidden = !p.hidden; renderRx(); };
+$('#rx-toggle').onclick = toggleRx;
+document.addEventListener('keydown', e => { if (e.ctrlKey && e.shiftKey && (e.key === 'R' || e.key === 'r')){ e.preventDefault(); toggleRx(); } });
+
+/* ---------- 시작 ---------- */
+(async () => { await loadPhotos(); if (P.active) S.mode = 'search'; render(); })();
+</script>
