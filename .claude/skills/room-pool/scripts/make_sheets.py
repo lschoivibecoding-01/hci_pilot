@@ -12,7 +12,7 @@ import unicodedata
 
 from PIL import Image, ImageDraw, ImageFont
 
-EXTS = ('.jpg', '.jpeg', '.png', '.webp', '.avif')
+EXTS = ('.jpg', '.jpeg', '.jfif', '.png', '.webp', '.avif')
 W, H, PER = 600, 400, 6
 
 
