@@ -829,8 +829,9 @@ const refOf = id => { const p = photoById(id); return {id, name: p ? p.name : id
 const likedRef = id => { const add = (P.likeLog || []).filter(e => e.id === id && e.action === '담기').pop(); return Object.assign(refOf(id), add ? {qn: add.qn, q: add.q, likedAt: add.at} : {}); };
 function archiveCurrent(status){
   reloadArch();
-  const no = (ARCH.reduce((m, r) => Math.max(m, r.no || 0), 0)) + 1;
-  const rec = {id: 'a' + Date.now().toString(36), no, label: P.pid || '', researcher: LS.get(WHO_KEY, ''), note: '', status,
+  const who = LS.get(WHO_KEY, '');
+  const no = ARCH.filter(r => !r.imported && (r.researcher || '') === who).reduce((m, r) => Math.max(m, r.no || 0), 0) + 1; // 불러온 남의 기록은 번호 매기기에서 뺀다
+  const rec = {id: 'a' + Date.now().toString(36), no, label: P.pid || '', researcher: who, note: '', status,
     startedAt: P.startedAt, finishedAt: P.finishedAt || new Date().toISOString(),
     liked: P.liked.map(likedRef), final: P.final ? refOf(P.final) : null, queries: (P.queries || []).slice(),
     likeLog: (P.likeLog || []).map(e => Object.assign({}, e, {name: refOf(e.id).name}))};
@@ -842,16 +843,23 @@ function thumbHTML(ref, isFinal){
   const p = photoById(ref.id);
   return `<figure class="${isFinal ? 'fin' : ''}">${p ? `<img alt="" src="${urlFor(p,'thumb')}">` : `<div class="ph-missing">풀에 없음</div>`}<figcaption>${isFinal ? '최종 · ' : ''}${esc(ref.name)}${ref.qn ? `<span class="q-tag">${ref.qn}번째 검색 · ${esc(ref.q)}</span>` : ''}</figcaption></figure>`;
 }
+const archWhoList = () => [...new Set(ARCH.map(r => r.researcher || ''))].sort();
+// 지금 화면에 보이는 기록: 진행자 필터 적용, 결정(기록) 시각 최신순
+const archShown = () => ARCH.filter(r => S.archWho == null || (r.researcher || '') === S.archWho).sort((a,b) => (b.finishedAt || '').localeCompare(a.finishedAt || ''));
 function renderArchive(){
-  const list = ARCH.slice().reverse();
-  const done = ARCH.filter(r => r.status === '완료').length;
+  const whos = archWhoList();
+  if (S.archWho != null && !whos.includes(S.archWho)) S.archWho = null;
+  const list = archShown();
+  const done = list.filter(r => r.status === '완료').length;
   $('#body').innerHTML = `<div class="stack">
-    <div class="row"><label class="small" for="who">진행자</label><input type="text" id="who" value="${esc(LS.get(WHO_KEY, ''))}" placeholder="예: 의현" autocomplete="off" style="width:160px"><span class="small muted">이 PC에서 진행하는 사람. 새 기록과 CSV 파일 이름에 붙습니다</span></div>
-    <div class="row between"><p class="small muted">최종 선택을 마치면 자동으로 기록됩니다. 최종 선택 전에 다음 참여자로 넘어가면 "미완료"로 남습니다. · 완료 <b class="mono">${done}</b> · 전체 <b class="mono">${ARCH.length}</b></p>
-      <div class="row"><button class="btn sm" id="arch-csv" ${ARCH.length ? '' : 'disabled'}>CSV 내보내기</button><button class="btn sm" id="arch-zip" ${ARCH.length ? '' : 'disabled'}>기록 + 최종 사진 (ZIP)</button></div></div>
+    <div class="row"><label class="small" for="who">진행자</label><input type="text" id="who" value="${esc(LS.get(WHO_KEY, ''))}" placeholder="예: 의현" autocomplete="off" style="width:160px"><span class="small muted">이 PC에서 진행하는 사람. 새 기록과 내보내기 파일 이름에 붙습니다</span></div>
+    <div class="row between"><p class="small muted">최종 선택을 마치면 자동으로 기록됩니다. 최종 선택 전에 다음 참여자로 넘어가면 "미완료"로 남습니다. · 완료 <b class="mono">${done}</b> · 전체 <b class="mono">${list.length}</b></p>
+      <div class="row">${whos.length > 1 ? `<select id="arch-who" style="width:auto" aria-label="진행자별 보기"><option value="">모든 진행자</option>${whos.map(w => `<option value="${esc(w)}" ${S.archWho === w ? 'selected' : ''}>${esc(w || '(이름 없음)')} · ${ARCH.filter(r => (r.researcher || '') === w).length}명</option>`).join('')}</select>` : ''}
+        <label class="btn sm" for="arch-imp" style="cursor:pointer" title="각자 내보낸 ZIP을 올리면 기록을 합쳐서 보여 줍니다. 여러 개를 한 번에 고를 수 있어요">기록 불러오기 (ZIP)</label><input type="file" id="arch-imp" accept=".zip,.json" multiple hidden>
+        <button class="btn sm" id="arch-zip" ${list.length ? '' : 'disabled'}>기록 + 최종 사진 (ZIP)</button></div></div>
     ${list.length ? list.map(r => `<div class="card stack arch" data-arch="${r.id}">
       <div class="row between">
-        <div class="row"><span class="mono small muted">#${r.no}</span><input type="text" class="arch-label" data-f="label" value="${esc(r.label)}" placeholder="참여자 ID" aria-label="참여자 ID (#${r.no})"><span class="pill ${r.status === '완료' ? 'ok' : 'warn'}">${r.status}</span></div>
+        <div class="row"><span class="mono small muted">#${r.no}</span><input type="text" class="arch-label" data-f="label" value="${esc(r.label)}" placeholder="참여자 ID" aria-label="참여자 ID (#${r.no})"><span class="pill ${r.status === '완료' ? 'ok' : 'warn'}">${r.status}</span>${r.imported ? '<span class="pill">불러온 기록</span>' : ''}</div>
         <div class="row">${r.final && photoById(r.final.id) ? `<a class="btn sm" href="${urlFor(photoById(r.final.id),'full')}" download="P${r.no}_FINAL_${esc(r.final.name.replace(/\.[^.]+$/, ''))}.jpg">최종 사진 저장</a>` : ''}<button class="btn sm danger" data-del="${r.id}" type="button">기록 삭제</button></div>
       </div>
       <dl class="kv"><dt>진행자</dt><dd>${esc(r.researcher || '—')}</dd><dt>${r.status === '완료' ? '결정 시각' : '기록 시각'}</dt><dd class="mono">${fmtTime(r.finishedAt)} (첫 검색부터 ${durMin(r)})</dd>
@@ -867,26 +875,60 @@ function renderArchive(){
     if (!b.dataset.sure){ b.dataset.sure = 1; b.textContent = '한 번 더 누르면 삭제'; setTimeout(() => { if (b.isConnected){ delete b.dataset.sure; b.textContent = '기록 삭제'; } }, 4000); return; }
     reloadArch(); ARCH = ARCH.filter(r => r.id !== b.dataset.del); saveArch(); render();
   });
-  const csv = $('#arch-csv'); if (csv) csv.onclick = () => download(`search_participants_${fileTag()}.csv`, '﻿' + archiveCSV(), 'text/csv');
+  const aw = $('#arch-who'); if (aw) aw.onchange = () => { S.archWho = aw.selectedIndex ? aw.value : null; renderArchive(); };
+  $('#arch-imp').onchange = e => importArchive(e.target.files);
   const zp = $('#arch-zip'); if (zp) zp.onclick = exportArchiveZip;
 }
-function archiveCSV(){
+function archiveCSV(recs = ARCH){
   const cell = v => { const x = String(v ?? ''); return /[",\n]/.test(x) ? `"${x.replace(/"/g,'""')}"` : x; };
   const head = ['no','researcher','participant_id','status','started_at','finished_at','query_count','queries','liked_count','liked_with_query','unliked_count','final_query','liked_files','final_file','final_in_liked_order'];
-  const rows = ARCH.map(r => [r.no, r.researcher || '', r.label, r.status, r.startedAt || '', r.finishedAt || '', (r.queries || []).length, (r.queries || []).map(x => x.q).join(' | '), r.liked.length, r.liked.map(x => `${x.name}@${x.qn ? x.qn + ':' + x.q : '-'}`).join(' | '), (r.likeLog || []).filter(e => e.action === '빼기').length, (() => { const f = r.final && r.liked.find(x => x.id === r.final.id); return f && f.qn ? `${f.qn}:${f.q}` : ''; })(), r.liked.map(x => x.name).join('|'), r.final ? r.final.name : '', r.final ? r.liked.findIndex(x => x.id === r.final.id) + 1 : '']);
+  const rows = recs.map(r => [r.no, r.researcher || '', r.label, r.status, r.startedAt || '', r.finishedAt || '', (r.queries || []).length, (r.queries || []).map(x => x.q).join(' | '), r.liked.length, r.liked.map(x => `${x.name}@${x.qn ? x.qn + ':' + x.q : '-'}`).join(' | '), (r.likeLog || []).filter(e => e.action === '빼기').length, (() => { const f = r.final && r.liked.find(x => x.id === r.final.id); return f && f.qn ? `${f.qn}:${f.q}` : ''; })(), r.liked.map(x => x.name).join('|'), r.final ? r.final.name : '', r.final ? r.liked.findIndex(x => x.id === r.final.id) + 1 : '']);
   return [head.join(','), ...rows.map(r => r.map(cell).join(','))].join('\n');
 }
 async function exportArchiveZip(){
   if (typeof JSZip === 'undefined'){ toast('ZIP을 만들려면 인터넷 연결이 필요합니다. CSV로 받아 주세요'); return; }
   toast('ZIP을 만드는 중…');
   const zip = new JSZip();
-  zip.file('participants.csv', '﻿' + archiveCSV());
-  zip.file('participants.json', JSON.stringify(ARCH, null, 1));
-  for (const r of ARCH){
-    const dir = `${r.researcher ? r.researcher.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 20) + '_' : ''}P${String(r.no).padStart(2,'0')}${r.label ? '_' + r.label.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 30) : ''}/`;
+  // 화면에 보이는 기록만 담는다 (진행자 필터를 걸면 그 사람 것만)
+  const recs = archShown();
+  zip.file('participants.csv', '﻿' + archiveCSV(recs));
+  zip.file('participants.json', JSON.stringify(recs, null, 1));
+  for (const r of recs){
+    const dir = `${r.researcher ? r.researcher.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 20) + '_' : ''}${String(r.no).padStart(2,'0')}${r.label ? '_' + r.label.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 30) : ''}/`;
     for (const ref of r.liked){ const p = photoById(ref.id); if (p) zip.file(dir + (r.final && ref.id === r.final.id ? 'FINAL_' : 'liked_') + ref.name.replace(/\.[^.]+$/, '') + '.jpg', p.blob); }
   }
-  download(`search_participants_${fileTag()}.zip`, await zip.generateAsync({type:'blob'}), 'application/zip');
+  const tag = S.archWho != null ? (S.archWho || '이름없음').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 20) + '_' + new Date().toISOString().slice(0,10)
+    : archWhoList().length > 1 ? '전체_' + new Date().toISOString().slice(0,10) : fileTag();
+  download(`search_participants_${tag}.zip`, await zip.generateAsync({type:'blob'}), 'application/zip');
+}
+// 각자 내보낸 ZIP(또는 participants.json)을 올리면 기록을 합친다. 같은 기록(id·진행자가 같음)은 건너뜀
+// 사진은 기록에 사진 id만 있으므로, 같은 기본 풀을 쓰는 한 이 브라우저의 풀에서 그대로 보인다
+async function importArchive(fileList){
+  const files = Array.from(fileList || []); if (!files.length) return;
+  reloadArch();
+  const key = r => r.id + '|' + (r.researcher || '');
+  const have = new Set(ARCH.map(key));
+  let added = 0, dup = 0, bad = 0;
+  for (const f of files){
+    let recs = null;
+    try{
+      if (/\.json$/i.test(f.name)) recs = JSON.parse(await f.text());
+      else {
+        if (typeof JSZip === 'undefined'){ toast('ZIP을 열려면 인터넷 연결이 필요합니다'); return; }
+        const zip = await JSZip.loadAsync(f);
+        const j = Object.values(zip.files).find(x => /participants\.json$/i.test(x.name));
+        recs = j ? JSON.parse(await j.async('string')) : null;
+      }
+    }catch(e){ recs = null; }
+    if (!Array.isArray(recs)){ bad++; continue; }
+    for (const r of recs){
+      if (!r || !r.id || !Array.isArray(r.liked)) continue;
+      if (have.has(key(r))){ dup++; continue; }
+      ARCH.push(Object.assign({}, r, {imported: true})); have.add(key(r)); added++;
+    }
+  }
+  saveArch(); render();
+  toast(`기록 ${added}건 추가${dup ? ` · 이미 있는 ${dup}건 건너뜀` : ''}${bad ? ` · 읽지 못한 파일 ${bad}개 (기록 ZIP이 맞는지 확인해 주세요)` : ''}`);
 }
 
 /* ---------- 연구자 패널 (검색 화면에서 나가기) ---------- */
