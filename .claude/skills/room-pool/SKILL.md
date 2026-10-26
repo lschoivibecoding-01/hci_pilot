@@ -12,7 +12,7 @@ description: 방 사진 폴더를 받아 사진마다 검색 태그를 달고, �
 
 ## 준비
 
-Pillow가 필요하다. 없으면 `pip install pillow`(필요하면 `--break-system-packages`)로 설치한다.
+Pillow 11.3 이상이 필요하다(AVIF를 읽으려면). 없거나 낮으면 `pip install -U "pillow>=11.3"`(필요하면 `--break-system-packages`)로 설치한다. 받는 형식: jpg, jpeg, png, webp, avif.
 
 ## 순서
 
