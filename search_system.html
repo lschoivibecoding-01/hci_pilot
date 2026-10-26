@@ -594,21 +594,44 @@ async function importPool(file){
 const POOL_DIR = 'pool/';
 const canSyncPool = () => /^https?:$/.test(location.protocol);
 const poolId = name => 'pool_' + hash(name).toString(36);
-function showPoolLoading(total){
-  const el = document.createElement('div'); el.className = 'pool-loading'; document.body.appendChild(el);
-  return n => { if (n === null) el.remove(); else el.textContent = `사진을 불러오는 중… ${n} / ${total}`; };
+// 두 창이 동시에 열려도 한 창만 내려받는다: 받는 창이 rs_pool_lock을 몇 초마다 갱신하고, 다른 창은 끝날 때까지 기다린다
+const TAB_ID = uid(), POOL_LOCK = 'rs_pool_lock';
+const otherLock = () => { const l = LS.get(POOL_LOCK, null); return l && l.by !== TAB_ID && Date.now() - l.t < 8000 ? l : null; };
+const pause = ms => new Promise(r => setTimeout(r, ms));
+function showPoolLoading(){
+  const el = document.createElement('div'); el.className = 'pool-loading'; el.textContent = '사진을 불러오는 중…'; document.body.appendChild(el);
+  return (n, total) => { if (n === null) el.remove(); else el.textContent = `사진을 불러오는 중… ${n} / ${total}`; };
 }
 async function syncDefaultPool(force){
   if (!canSyncPool()) return false;
+  // 사진이 하나도 없으면 다 들어올 때까지 화면을 막는다 (빈 풀에서 참여자를 시작하지 않게)
+  let step = S.photos.length ? null : showPoolLoading(), changed = false;
+  const done = r => {
+    S.syncing = false; if (step) step(null);
+    const l = LS.get(POOL_LOCK, null); if (l && l.by === TAB_ID){ try{ localStorage.removeItem(POOL_LOCK); }catch(e){} }
+    return r;
+  };
+  // 잠금을 걸고 잠깐 뒤 다시 읽어 내 것인지 확인한다 (두 창이 동시에 걸면 나중에 쓴 쪽만 남는다)
+  const claim = async () => { LS.set(POOL_LOCK, {by: TAB_ID, t: Date.now(), n: 0, total: 0}); await pause(150); const l = LS.get(POOL_LOCK, null); return !!l && l.by === TAB_ID; };
+  for (;;){
+    if (otherLock()){
+      step = step || showPoolLoading();
+      for (let l; (l = otherLock()); ){ if (l.total) step(l.n, l.total); await pause(700); }
+      await loadPhotos(); changed = true;
+    }
+    if (await claim()) break;
+  }
+  S.syncing = true; // 받는 동안 다른 창의 신호로 사진 목록을 다시 읽지 않는다
   const res = await fetch(POOL_DIR + 'pool.csv', {cache:'no-cache'}).catch(() => null);
-  if (!res || !res.ok) return false;
+  if (!res || !res.ok) return done(changed);
   const text = await res.text(), ver = String(hash(text));
-  if (!force && LS.get('rs_pool_ver', '') === ver && S.photos.some(p => p.fromPool)) return false;
-  const rows = parseCSV(text).filter(r => r.file);
-  const step = showPoolLoading(rows.length), keep = new Set();
-  let failed = 0;
-  step(0);
-  for (let i = 0; i < rows.length; i++){
+  if (!force && LS.get('rs_pool_ver', '') === ver && S.photos.some(p => p.fromPool)) return done(changed);
+  const rows = parseCSV(text).filter(r => r.file), total = rows.length, keep = new Set();
+  let failed = 0, n = 0, next = 0;
+  step = step || showPoolLoading();
+  const lock = () => LS.set(POOL_LOCK, {by: TAB_ID, t: Date.now(), n, total});
+  lock(); step(0, total);
+  const one = async i => {
     const r = rows[i], name = r.file.normalize('NFC'), id = poolId(name);
     const tags = (r.tags || '').split(/[;|]/).map(t => t.trim()).filter(Boolean), contains = targetIdsFrom(r.contains);
     const old = S.photos.find(p => p.id === id);
@@ -619,15 +642,16 @@ async function syncDefaultPool(force){
       if (thumb){ const rec = {id, name, tags, contains, blob, thumb, addedAt:i, fromPool:true}; await DB.put(rec); S.photos.push(rec); keep.add(id); }
       else failed++;
     }
-    step(i + 1);
-  }
+    n++; step(n, total); lock();
+  };
+  // 6장씩 동시에 받는다
+  await Promise.all(Array.from({length: 6}, async () => { while (next < total) await one(next++); }));
   // 기본 풀에서 빠진 사진은 지운다 (연구자가 직접 넣은 사진은 그대로)
   for (const p of S.photos.filter(p => p.fromPool && !keep.has(p.id))) await DB.del(p.id);
   S.photos = S.photos.filter(p => !p.fromPool || keep.has(p.id)).sort((a,b) => a.addedAt - b.addedAt);
   if (!failed) LS.set('rs_pool_ver', ver);
-  step(null);
   if (failed) toast(`사진 ${failed}장을 불러오지 못했습니다. 새로고침하면 다시 시도합니다`);
-  return true;
+  return done(true);
 }
 
 /* ---------- 참여자 검색 화면 ---------- */
@@ -897,9 +921,9 @@ window.addEventListener('storage', e => {
     if (RESEARCH_PAGE) rerenderResearcher(); // 진행 중 표시 갱신
     else if (SEARCH_PAGE && !P.pid){ S.nextUp = false; S.lastQuery = ''; render(); } // 연구자 창에서 "미완료로 끝내기"
   }
-  if (e.key === 'rs_pool_ping'){
+  if (e.key === 'rs_pool_ping' && !S.syncing){
     clearTimeout(poolTimer);
-    poolTimer = setTimeout(async () => { await loadPhotos(); if (S.mode !== 'search' && (S.rtab || 'pool') === 'pool' && !document.querySelector('.pool-loading')) render(); }, 800);
+    poolTimer = setTimeout(async () => { if (S.syncing) return; await loadPhotos(); if (S.mode !== 'search' && (S.rtab || 'pool') === 'pool' && !document.querySelector('.pool-loading')) render(); }, 800);
   }
 });
 
