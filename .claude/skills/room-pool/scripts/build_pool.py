@@ -4,7 +4,6 @@
 사용: python build_pool.py <사진폴더> <작업폴더> [출력ZIP]
 입력: <작업폴더>/index.json (make_sheets.py가 만든 번호→파일명)
       <작업폴더>/tags.json  ({"1": ["침실", "우드", ...], ...} 번호 또는 파일명을 키로)
-      <작업폴더>/flags.json (선택: {"12": "식물이 보임", ...} 확인이 필요한 사진)
 결과: <작업폴더>/pool.csv, 출력ZIP(기본 <작업폴더>/room_pool.zip)
       ZIP 안: pool.csv + photos/*.jpg (긴 변 1600px JPEG). search_system.html의 "풀 불러오기"로 바로 넣는다.
 """
@@ -23,18 +22,23 @@ from make_sheets import list_photos  # noqa: E402
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAX_EDGE = 1600
+# search_system.html의 TARGETS 이름. 짧게 적어도 받아 준다
+# 타깃 요소 태그 → search_system.html의 TARGETS 이름. contains 칸은 태그에서 자동으로 채운다
+TARGET_NAMES = {'식물': '식물', '러그': '러그', '스탠드': '스탠드 조명', '액자': '벽 그림', '따뜻한조명': '따뜻한 조명'}
 
 
 def nfc(s):
     return unicodedata.normalize('NFC', s)
 
 
+def split_list(v):
+    return [t.strip() for t in (v if isinstance(v, list) else str(v).replace(';', ',').split(',')) if t.strip()]
+
+
 def main(src, work, out_zip=None):
     out_zip = out_zip or os.path.join(work, 'room_pool.zip')
     index = json.load(open(os.path.join(work, 'index.json'), encoding='utf-8'))
     tags = json.load(open(os.path.join(work, 'tags.json'), encoding='utf-8'))
-    flags_path = os.path.join(work, 'flags.json')
-    flags = json.load(open(flags_path, encoding='utf-8')) if os.path.exists(flags_path) else {}
     vocab = {t for g in json.load(open(os.path.join(HERE, 'vocab.json'), encoding='utf-8'))['groups'] for t in g['tags']}
 
     by_name = {nfc(os.path.basename(p)): p for p in list_photos(src)}
@@ -43,7 +47,8 @@ def main(src, work, out_zip=None):
     tag_by_name = {}
     for k, v in tags.items():
         name = index.get(str(k), nfc(k))
-        tag_by_name[name] = [t.strip() for t in (v if isinstance(v, list) else str(v).replace(';', ',').split(',')) if t.strip()]
+        tag_by_name[name] = split_list(v)
+    con_by_name = {n: [TARGET_NAMES[t] for t in ts if t in TARGET_NAMES] for n, ts in tag_by_name.items()}
 
     missing = [n for n in index.values() if not tag_by_name.get(n)]
     if missing:
@@ -71,7 +76,7 @@ def main(src, work, out_zip=None):
             b = io.BytesIO()
             im.save(b, 'JPEG', quality=86)
             z.writestr('photos/' + jpg, b.getvalue())
-            rows.append([jpg, ';'.join(tag_by_name.get(name, [])), ''])
+            rows.append([jpg, ';'.join(tag_by_name.get(name, [])), ';'.join(con_by_name.get(name, []))])
         s = io.StringIO()
         w = csv.writer(s)
         w.writerow(['file', 'tags', 'contains'])
@@ -85,10 +90,8 @@ def main(src, work, out_zip=None):
     print(f'완료: 사진 {len(rows)}장 · 태그 평균 {sum(len(r[1].split(";")) for r in rows if r[1]) / max(1, len(rows)):.1f}개 · ZIP {size:.1f}MB')
     print(f'  ZIP   {out_zip}')
     print(f'  CSV   {os.path.join(work, "pool.csv")}')
-    if flags:
-        print(f'⚠ 확인이 필요한 사진 {len(flags)}장 (타깃 요소가 보이는 듯함):')
-        for k, why in flags.items():
-            print(f'  #{k} {index.get(str(k), k)} — {why}')
+    counts = {t: sum(t in r[2].split(';') for r in rows) for t in TARGET_NAMES.values()}
+    print('  타깃 요소가 보이는 사진: ' + ' · '.join(f'{t} {c}' for t, c in counts.items()) + f' · 하나도 없음 {sum(not r[2] for r in rows)}')
 
 
 if __name__ == '__main__':

@@ -207,25 +207,51 @@ const TARGETS = [
   {id:'warm', name:'따뜻한 조명', kw:['간접조명','전구색','노란조명','warm light']},
   {id:'bedding', name:'겹친 침구', kw:['호텔침구','쿠션','블랭킷','throw','pillows']}
 ];
+// 방 종류(침실·원룸 등)는 태그로 달지 않는다: 그런 검색어로는 결과가 걸러지지 않게 하기 위함
+// 타깃 요소(식물·러그·액자·스탠드·따뜻한조명)도 태그로 단다. 비율 조정용 표시는 contains에 따로 둔다
 const TAG_GROUPS = [
-  {name:'방 종류', tags:['침실','원룸','작은방','거실','오피스텔','다락방','작업실']},
-  {name:'분위기·스타일', tags:['미니멀','모던','북유럽','빈티지','내추럴','아늑한','깔끔한','호텔','인더스트리얼','앤틱']},
-  {name:'색·톤·빛', tags:['화이트','베이지','우드','그레이','블랙','그린','블루','핑크','레드','밝은','어두운','햇살','노을','저녁','야경']},
-  {name:'가구·구성', tags:['책상','소파','수납장','책장','옷장','거울','커튼','큰창문','침대프레임','넓은','좁은','화장대']},
-  {name:'전망·특징', tags:['시티뷰','리버뷰','벽난로','사진벽','곡선','판타지']}
+  {name:'분위기', tags:['아늑한','차분한','따뜻한','시원한','활기찬','몽환적','고급스러운']},
+  {name:'스타일', tags:['모던','미니멀','북유럽','내추럴','빈티지','미드센추리','보헤미안','재패니즈','호텔','인더스트리얼','앤틱']},
+  {name:'색', tags:['화이트','베이지','브라운','그레이','블랙','그린','민트','블루','옐로','오렌지','핑크','레드','파스텔']},
+  {name:'빛·시간대', tags:['밝은','어두운','햇살','노을','저녁']},
+  {name:'소재·질감', tags:['우드','라탄','패브릭','가죽','대리석','콘크리트','퍼','유리','금속']},
+  {name:'패턴', tags:['체크','스트라이프','플라워','기하학']},
+  {name:'가구', tags:['책상','테이블','소파','수납장','책장','옷장','행거','화장대','거울','커튼','블라인드','TV']},
+  {name:'침대', tags:['바닥매트리스','저상형','수납침대','헤드보드']},
+  {name:'조명', tags:['스탠드','따뜻한조명','펜던트','종이조명','줄조명']},
+  {name:'소품·장식', tags:['식물','러그','액자','사진벽','꽃','인형','책','시계','빔프로젝터','턴테이블']},
+  {name:'생활감', tags:['깔끔한','생활감','맥시멀']},
+  {name:'공간·전망', tags:['넓은','좁은','큰창문','다락','복층','높은천장','곡선','시티뷰','산뷰']},
+  {name:'반려동물', tags:['고양이','강아지']}
 ];
-// 한국어 태그를 영어 검색어로도 찾을 수 있게 하는 동의어 (검색 색인에만 쓰임)
+// 한국어 태그를 영어 검색어·비슷한 말로도 찾을 수 있게 하는 동의어 (검색 색인에만 쓰임)
 const SYN = {
-  '거실':['living room','livingroom','lounge','소파'],'작업실':['studio','workspace','atelier','작업'],'레드':['red','빨간','와인'],'노을':['sunset','golden hour','석양'],'저녁':['evening','night','밤'],
-  '야경':['night','night view','city lights','밤','도시'],'화장대':['vanity','dresser'],'시티뷰':['city view','city','skyline','도시','전망','view'],'리버뷰':['river view','river','한강','강','전망','view'],
-  '벽난로':['fireplace'],'사진벽':['photo wall','gallery wall','poster wall','사진','포스터'],'곡선':['curved','organic','round','둥근'],'판타지':['fantasy','dreamy','몽환'],
-  '침실':['bedroom','bed room','방'],'원룸':['studio','one room','oneroom','자취방','방'],'작은방':['small room','tiny','방'],'오피스텔':['officetel','apartment','방'],'다락방':['attic','loft'],
-  '미니멀':['minimal','minimalist','심플','simple'],'모던':['modern','contemporary'],'북유럽':['scandinavian','nordic','scandi'],'빈티지':['vintage','retro','레트로'],
-  '내추럴':['natural','자연'],'아늑한':['cozy','cosy','포근','따뜻한','warm'],'깔끔한':['clean','tidy','neat'],'호텔':['hotel','luxury','고급'],'인더스트리얼':['industrial'],'앤틱':['antique','classic','클래식'],
-  '화이트':['white','흰','하얀'],'베이지':['beige','cream','크림'],'우드':['wood','wooden','나무','원목'],'그레이':['gray','grey','회색'],'블랙':['black','검정','dark'],'그린':['green','초록','민트'],
-  '블루':['blue','파란','하늘'],'핑크':['pink','분홍'],'밝은':['bright','light','환한'],'어두운':['dark','moody','무드'],'햇살':['sunlight','sunny','daylight','햇빛','채광'],
-  '책상':['desk','workspace','작업'],'소파':['sofa','couch'],'수납장':['storage','cabinet','drawer','서랍'],'책장':['bookshelf','shelf','선반'],'옷장':['closet','wardrobe'],'거울':['mirror'],
-  '커튼':['curtain','curtains'],'큰창문':['window','big window','창문','창'],'침대프레임':['bed frame','bed','침대'],'넓은':['spacious','large','big'],'좁은':['small','narrow','compact']
+  '아늑한':['cozy','cosy','포근','포근한'],'차분한':['calm','serene','peaceful','잔잔한','조용한'],'따뜻한':['warm','온기','따스한'],'시원한':['cool','fresh','청량','청량한','시원'],
+  '활기찬':['vibrant','lively','colorful','컬러풀','화사한','발랄한'],'몽환적':['dreamy','fantasy','판타지','몽환'],'고급스러운':['luxury','luxurious','elegant','고급','럭셔리'],
+  '모던':['modern','contemporary','시크','chic'],'미니멀':['minimal','minimalist','심플','simple'],'북유럽':['scandinavian','nordic','scandi'],'내추럴':['natural','자연','자연스러운'],
+  '빈티지':['vintage','retro','레트로'],'미드센추리':['mid century','midcentury','mid-century'],'보헤미안':['bohemian','boho','보호'],'재패니즈':['japanese','japandi','일본','일본풍','무인양품','muji'],
+  '호텔':['hotel','호텔식'],'인더스트리얼':['industrial'],'앤틱':['antique','classic','클래식','프렌치','french'],
+  '화이트':['white','흰','하얀','흰색','무채색','모노톤','올화이트'],'베이지':['beige','cream','크림','아이보리'],'브라운':['brown','갈색','테라코타'],'그레이':['gray','grey','회색','무채색','모노톤'],'블랙':['black','검정','검은','무채색','모노톤','올블랙'],
+  '그린':['green','초록','녹색'],'민트':['mint','민트색'],'블루':['blue','파란','파랑','하늘색','네이비','navy'],'옐로':['yellow','노란','노랑','머스타드'],'오렌지':['orange','주황','테라코타','terracotta'],
+  '핑크':['pink','분홍','연핑크'],'레드':['red','빨간','와인','버건디','burgundy'],'파스텔':['pastel','파스텔톤'],
+  '밝은':['bright','light','환한'],'어두운':['dark','moody','무드'],'햇살':['sunlight','sunny','daylight','햇빛','채광','아침','morning'],'노을':['sunset','golden hour','석양'],'저녁':['evening','night','밤','야경'],
+  '우드':['wood','wooden','나무','원목','우드톤'],'라탄':['rattan','wicker','등나무'],'패브릭':['fabric','천'],'가죽':['leather'],'대리석':['marble'],'콘크리트':['concrete','노출콘크리트'],
+  '퍼':['fur','faux fur','양털'],'유리':['glass','투명'],'금속':['metal','steel','철제','스틸','실버','silver'],
+  '체크':['check','checker','gingham','plaid','체커보드','깅엄'],'스트라이프':['stripe','striped','줄무늬'],'플라워':['floral','flower pattern','꽃무늬'],'기하학':['geometric','기하학무늬'],
+  '책상':['desk','workspace','작업','작업공간','재택','재택근무','컴퓨터','모니터'],'테이블':['table','식탁','원형테이블'],'소파':['sofa','couch'],'수납장':['storage','cabinet','drawer','서랍'],'책장':['bookshelf','shelf','선반'],
+  '옷장':['closet','wardrobe','붙박이장','옷'],'행거':['hanger','clothes rack','옷걸이'],'화장대':['vanity','dresser'],'거울':['mirror'],'커튼':['curtain','curtains'],'블라인드':['blind','blinds'],
+  'TV':['tv','television','티비','텔레비전'],
+  '바닥매트리스':['floor mattress','mattress','매트리스','바닥'],'저상형':['low bed','platform bed','저상형침대','낮은','낮은침대'],'수납침대':['storage bed','서랍침대'],'헤드보드':['headboard','침대헤드'],
+  '스탠드':['lamp','floor lamp','table lamp','램프','무드등','스탠드조명'],'따뜻한조명':['warm light','간접조명','전구색','노란조명','조명'],'펜던트':['pendant','천장조명','펜던트조명'],
+  '종이조명':['paper lamp','paper lantern','한지','한지조명'],'줄조명':['fairy lights','string lights','전구','알전구','가랜드'],
+  '식물':['plant','plants','greenery','화분','플랜테리어','몬스테라'],'러그':['rug','carpet','카펫'],'액자':['art','poster','painting','frame','그림','포스터','패브릭포스터','벽그림'],
+  '사진벽':['photo wall','gallery wall','사진'],'꽃':['flower','flowers','꽃병','화병'],'인형':['doll','plush','teddy','곰인형'],'책':['books','book','독서'],'시계':['clock','벽시계'],
+  '빔프로젝터':['projector','빔','프로젝터'],'턴테이블':['turntable','record player','레코드','lp','음악'],
+  '깔끔한':['clean','tidy','neat','정돈','정돈된'],'생활감':['lived-in','messy','현실','현실적'],'맥시멀':['maximal','maximalist','아기자기'],
+  '넓은':['spacious','large','big'],'좁은':['small','narrow','compact','작은'],'큰창문':['window','big window','창문','창','통창','창가'],'다락':['attic','loft','다락방','경사천장'],
+  '복층':['duplex','mezzanine','loft bed','2층'],'높은천장':['high ceiling','층고'],'곡선':['curved','organic','round','둥근','아치'],
+  '시티뷰':['city view','city','skyline','도시','전망','view','야경'],'산뷰':['mountain view','mountain','산','전망','view'],
+  '고양이':['cat','cats','반려동물','pet','반려묘'],'강아지':['dog','puppy','개','반려동물','pet','반려견']
 };
 const MAX_EDGE = 1600, THUMB_EDGE = 420;
 
@@ -305,16 +331,21 @@ function searchIndex(p){
   p.tags.forEach(t => { out.add(t.toLowerCase()); (SYN[t] || []).forEach(s => out.add(s.toLowerCase())); });
   return [...out];
 }
-const isExcluded = () => false; // 풀은 처음부터 요소 없는 사진으로 채우므로 제외 기능을 쓰지 않음
+const isExcluded = () => false; // contains는 비율 조정용 표시일 뿐, 검색에서 빼지 않음
 const usable = () => S.photos.filter(p => !isExcluded(p));
+// 방·침대 자체를 가리키는 말은 점수에 넣지 않음 ("차분한 방"의 "방"이 자취방·다락방에 걸리지 않게)
+const ROOM_WORDS = new Set(['방','방을','방이','침실','원룸','투룸','자취방','거실','집','인테리어','사진','room','rooms','bedroom','interior','photo','침대','bed','beds','벽','천장','공간','컬러','color','오피스텔']);
 function tokenize(q){
   const neg = [], pos = [];
   const rest = q.toLowerCase().replace(/(\S+?)\s*(없는|없이|빼고|제외|말고)/g, (_, w) => { neg.push(w); return ' '; });
   rest.split(/[\s,]+/).filter(Boolean).forEach(t => {
     if (t.startsWith('-') && t.length > 1){ neg.push(t.slice(1)); return; }
+    if (ROOM_WORDS.has(t)) return;
+    const py = t.match(/^(\d+)평$/); // 평수: 10평 이하는 좁은 방으로 본다
+    if (py){ if (+py[1] <= 10) pos.push('좁은'); return; }
     pos.push(t);
-    const stem = t.replace(/(한|인|의|을|를|이|가|은|는|에|로|으로|같은|느낌|스타일|분위기|있는)$/,'');
-    if (stem && stem !== t && stem.length >= 2) pos.push(stem);
+    const stem = t.replace(/(한|인|의|을|를|이|가|은|는|에|로|으로|같은|느낌|스타일|분위기|있는|처럼|톤|색|이랑|랑|만|하게|게|에서)$/,'');
+    if (stem && stem !== t && !ROOM_WORDS.has(stem)) pos.push(stem);
   });
   return {pos:[...new Set(pos)], neg:[...new Set(neg)]};
 }
@@ -322,9 +353,12 @@ function runSearch(q, seed){
   const {pos, neg} = tokenize(q);
   const scored = usable().map(p => {
     const idx = searchIndex(p);
-    const match = t => idx.some(g => g.includes(t) || (t.length >= 2 && g.length >= 2 && t.includes(g)));
+    // 태그가 검색어를 품으면 1점, 검색어가 태그를 품기만 하면 0.5점 (턴테이블 → 테이블)
+    // 한 글자 검색어는 태그·동의어와 똑같을 때만 (비 → 텔레비전, 큰 → 큰창문 같은 오탐 방지)
+    const part = t => t.length >= 2 && idx.some(g => g.length >= 2 && t.includes(g));
+    const match = t => t.length < 2 ? (idx.includes(t) ? 1 : 0) : idx.some(g => g.includes(t)) ? 1 : part(t) ? .5 : 0;
     if (neg.some(match)) return null;
-    return {p, score: pos.reduce((a,t) => a + (match(t) ? 1 : 0), 0), tie: hash(seed + q + p.id)};
+    return {p, score: pos.reduce((a,t) => a + match(t), 0), tie: hash(seed + q + p.id)};
   }).filter(Boolean);
   const hits = scored.filter(x => x.score > 0).sort((a,b) => b.score - a.score || a.tie - b.tie);
   let list = hits, padded = false;
