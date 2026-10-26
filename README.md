@@ -190,4 +190,25 @@ ZIP 안에는 이런 것이 들어 있습니다.
 - `.claude/skills/room-pool/` — 사진 태그 달기 도구 (Claude Code 스킬)
 - `CLAUDE.md` — 개발 인수인계 문서
 
+### 코드를 고치려면
+
+1. **권한 받기**: 의현에게 GitHub 아이디를 알려 주면 저장소 공동 작업자로 초대합니다 (Settings → Collaborators → Add people). 이메일로 온 초대를 수락하세요.
+2. **내려받기**: `git clone https://github.com/projectmuyu/hci_pilot.git`
+3. **고친 뒤 확인**: `search_system.html`을 더블클릭하면 사진이 자동으로 들어오지 않습니다. 폴더에서 아래를 실행하고 브라우저로 여세요.
+   ```
+   python -m http.server
+   ```
+   → `http://localhost:8000/search_system.html?view=researcher` / `?view=search`
+4. **올리기**: `git pull` → `git add` → `git commit` → `git push`
+5. **반영**: 1~2분 뒤 GitHub Pages에 반영되고, 각자 새로고침하면 바뀐 버전이 됩니다.
+
+Claude Code를 쓰면 `CLAUDE.md`(구조·저장 방식·주요 함수 정리)를 자동으로 읽어서 이어서 작업하기 쉽습니다.
+
+**주의**
+- `main`에 올리면 **바로 모두에게 적용**됩니다. 실험 기간 중에는 고치지 않거나, 세 사람이 시점을 맞추세요.
+- 고치기 전에 `git pull`로 최신을 받고, 작업한다고 서로 알리세요 (같은 파일을 동시에 고치면 충돌). 더 안전하게 하려면 브랜치를 만들어 Pull Request로 올리고 의현이 확인 후 합칩니다.
+- 아래를 바꾸면 **이미 쌓인 기록이 안 보이거나 기록 불러오기가 안 맞을 수 있습니다**: 저장 이름(`rs_archive`, `rs_pick` 등), 기록 형식(`participants.json` 구조), 사진 id 만드는 방식(`pool_` + 파일 이름).
+- 검색 규칙이나 태그를 바꾸면 같은 검색어라도 결과가 달라집니다. 실험 중이면 참여자 간 조건이 달라지니 주의하세요.
+- 권한 없이 제안만 하려면 저장소를 Fork해서 고친 뒤 Pull Request를 보내 주세요.
+
 </details>
