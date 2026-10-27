@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ko">
 <meta charset="utf-8">
+<meta name="color-scheme" content="light">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>검색</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -18,16 +19,8 @@
   --f-body:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
   --f-mono:var(--f-body); /* 숫자는 본문 글꼴의 고정폭 숫자(tabular-nums)로. 한글이 섞인 줄에서 고정폭 글꼴이 튀지 않게 */
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#141412; --surface:#1B1B18; --card:#22221F; --sunk:#22221F; --sec:#2D2D29; --sec-press:#3B3B36;
-  --ink:#F2F2ED; --body:#DEDED7; --muted:#A5A59D; --ash:#7D7D76; --line:#363631; --line-soft:#2D2D29;
-  --accent:#EDEDE7; --accent-press:#FFFFFF; --accent-ink:#141412; --accent-soft:#2D2D29;
-  --research:#F1C47E; --research-soft:#2D2313; --danger:#F28A82; --danger-soft:#3A1D1B; --scrim:rgba(0,0,0,.7); color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#141412; --surface:#1B1B18; --card:#22221F; --sunk:#22221F; --sec:#2D2D29; --sec-press:#3B3B36;
-  --ink:#F2F2ED; --body:#DEDED7; --muted:#A5A59D; --ash:#7D7D76; --line:#363631; --line-soft:#2D2D29;
-  --accent:#EDEDE7; --accent-press:#FFFFFF; --accent-ink:#141412; --accent-soft:#2D2D29;
-  --research:#F1C47E; --research-soft:#2D2313; --danger:#F28A82; --danger-soft:#3A1D1B; --scrim:rgba(0,0,0,.7); color-scheme:dark}
+/* 늘 밝은 화면만 쓴다 (2026-10-27.5부터 다크 모드 없음: 참여자마다 사진이 놓이는 바탕이 달라지지 않게) */
+:root{color-scheme:light}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{scrollbar-gutter:stable}
@@ -40,7 +33,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .wrap{max-width:1280px;margin:0 auto}
 body.search-mode .wrap{max-width:1680px}
 .topbar{display:flex;align-items:center;gap:12px;justify-content:space-between;min-height:64px;padding-block:12px;border-bottom:1px solid var(--line);margin-bottom:24px}
-.brand{font-weight:700;color:var(--ink);font-size:16px}
+.brand{font-weight:700;color:var(--ink);font-size:16px;white-space:nowrap}
+@media (max-width:767px){.topbar{flex-wrap:wrap}#topright{width:100%}#topright .live-box{justify-content:flex-start}}
 .stack{display:flex;flex-direction:column;gap:16px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .between{justify-content:space-between}
@@ -106,6 +100,9 @@ td.num{text-align:right;font-family:var(--f-mono)}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:14px} .kv dt{color:var(--muted)} .kv dd{margin:0;color:var(--ink)}
 .pool-loading{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);color:var(--muted);z-index:80;font-size:15px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(88px + env(safe-area-inset-bottom,0px));background:var(--accent);color:var(--accent-ink);padding:10px 18px;border-radius:var(--pill);z-index:70;font-size:14px;font-weight:500;max-width:calc(100vw - 32px)}
+.toast.undo{display:flex;align-items:center;gap:4px;padding:4px 4px 4px 20px;white-space:nowrap}
+.toast.undo button{border:0;background:transparent;color:inherit;font:inherit;font-weight:700;text-decoration:underline;text-underline-offset:3px;min-height:40px;padding:0 14px;border-radius:var(--pill);cursor:pointer}
+.toast.undo button:hover{background:rgba(255,255,255,.14)}
 #rx-toggle{position:fixed;right:8px;bottom:8px;width:14px;height:14px;border-radius:50%;border:0;background:var(--line);opacity:.5;cursor:pointer;z-index:60}
 #rx-panel{position:fixed;right:12px;bottom:32px;width:min(320px,calc(100vw - 24px));background:var(--surface);border:1px solid var(--research);border-radius:var(--r);padding:14px;z-index:61;display:flex;flex-direction:column;gap:10px}
 .prog-bar{height:6px;border-radius:3px;background:var(--sec);overflow:hidden}.prog-bar i{display:block;height:100%;background:var(--accent)}
@@ -134,13 +131,19 @@ body.search-mode .topbar{display:none}
 .g-bar{display:flex;justify-content:flex-end;padding-top:16px}
 .g-home{min-height:72vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding-top:24px}
 .g-home .g-form{width:min(640px,100%)}
-.g-task{color:var(--muted);font-size:16px;line-height:1.55;text-align:center;max-width:720px;margin:0;word-break:keep-all;text-wrap:balance}
-/* 결과 화면 위 고정 머리: 가운데 검색창 + 오른쪽 "마음에 든 사진 N", 아래 과제 안내 한 줄 */
+.g-task{color:var(--muted);font-size:17px;line-height:1.6;text-align:center;max-width:760px;margin:0;word-break:keep-all;text-wrap:balance}
+.g-task>span{display:inline-block} /* 두 문장이 한 줄에 안 들어가면 문장 단위로 줄을 바꾼다 */
+/* 첫 화면 검색창 아래 시작 단어 (STARTER_CHIPS). 누르면 그 말로 검색. 결과 화면에는 없다 */
+.g-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;width:min(640px,100%);margin:0;padding:0;list-style:none}
+.g-chip{display:inline-flex;align-items:center;min-height:40px;padding:0 18px;border:0;border-radius:var(--pill);background:var(--card);color:var(--body);font-size:15px;font-weight:500;cursor:pointer;white-space:nowrap}
+.g-chip:hover{background:var(--sec);color:var(--ink)}
+.g-chip:active{background:var(--sec-press)}
+/* 결과 화면 위 고정 머리: 가운데 검색창 + 오른쪽 "담은 사진 N", 아래 과제 안내 한 줄 */
 .g-top{position:sticky;top:0;z-index:30;background:var(--bg);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,720px) minmax(0,1fr);align-items:center;column-gap:16px;row-gap:6px;padding-block:12px 10px;margin-bottom:16px;
   box-shadow:0 0 0 100vmax var(--bg),0 1px 0 100vmax var(--line);clip-path:inset(0 -100vmax -1px)}
 .g-top .g-form{grid-column:2}
 .g-top .g-saved{grid-column:3;justify-self:end}
-.g-task.sm{grid-column:2;font-size:13px;text-align:center;line-height:1.45;padding-inline:8px}
+.g-task.sm{grid-column:1/-1;justify-self:center;max-width:960px;font-size:14px;text-align:center;line-height:1.5;padding-inline:8px}
 .g-saved{display:inline-flex;align-items:center;gap:8px;border:0;background:var(--card);border-radius:var(--pill);height:48px;padding:0 18px;cursor:pointer;font-weight:600;font-size:14px;color:var(--muted);white-space:nowrap}
 .g-saved:hover{background:var(--sec)}
 .g-saved .hrt path{fill:currentColor;stroke:none}
@@ -149,7 +152,7 @@ body.search-mode .topbar{display:none}
 @media (max-width:767px){
   .g-top{grid-template-columns:minmax(0,1fr) auto;column-gap:8px;padding-block:10px 8px;margin-bottom:12px}
   .g-top .g-form{grid-column:1}.g-top .g-saved{grid-column:2}
-  .g-task.sm{grid-column:1/-1;text-align:left;padding-inline:4px;font-size:12.5px}
+  .g-task.sm{grid-column:1/-1;justify-self:stretch;text-align:left;padding-inline:4px;font-size:13.5px}
   .g-top .g-saved{padding:0 14px}.g-top .g-saved .lbl{display:none}
 }
 /* 사진 칸 쌓기: 칸 위치·크기는 layoutMasonry가 사진 비율(ar)로 정한다 (자르지 않음, 순위대로 가장 짧은 열에) */
@@ -161,13 +164,18 @@ body.search-mode .topbar{display:none}
 .g-open::after{content:"";position:absolute;inset:0;background:#000;opacity:0;transition:opacity .15s}
 .g-open:hover::after{opacity:.08}
 .g-pick .g-open{cursor:pointer}
-/* 담기 버튼: 사진 오른쪽 위, 늘 보임. 보이는 높이 36px(좁은 화면 32px), 누르는 영역은 위아래로 넓혀 44px */
-.g-like{position:absolute;top:8px;right:8px;display:inline-flex;align-items:center;gap:5px;height:36px;padding:0 13px 0 11px;border:0;border-radius:var(--pill);cursor:pointer;
-  background:rgba(255,255,255,.94);color:#262622;font-weight:700;font-size:13px;line-height:1;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
-.g-like::before{content:"";position:absolute;inset:-4px}
+/* 담기 버튼: 사진 오른쪽 위, 늘 보이는 하트만 있는 동그란 버튼(보이는 크기 36px, 누르는 영역은 ::before로 44px). 담으면 먹색 바탕 + 흰 하트 */
+.g-like{position:absolute;top:8px;right:8px;display:grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:50%;cursor:pointer;
+  background:rgba(255,255,255,.9);color:#262622;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+.g-like::before{content:"";position:absolute;inset:-4px;border-radius:50%}
 .g-like:hover{background:#fff}
 .g-like.on{background:#262622;color:#fff;box-shadow:none}
 .g-like.on:hover{background:#000}
+/* 모아 보기에서 빼기(×): 오른쪽 위, 보이는 크기 32px, 누르는 영역 44px */
+.g-remove{position:absolute;top:8px;right:8px;display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:50%;cursor:pointer;
+  background:rgba(255,255,255,.9);color:#262622;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+.g-remove::before{content:"";position:absolute;inset:-6px;border-radius:50%}
+.g-remove:hover{background:#fff}
 .hrt{flex:none;display:block}
 .hrt path{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}
 .on .hrt path{fill:currentColor;stroke:currentColor}
@@ -178,10 +186,15 @@ body.search-mode .topbar{display:none}
 .g-pick .g-open{border-radius:var(--r);overflow:hidden}
 .g-pick .g-item.sel{outline:3px solid var(--accent);outline-offset:2px}
 .g-pick .g-item.sel .g-check{display:grid}
-@media (max-width:767px){.g-like{height:32px;padding:0 11px 0 9px;font-size:12.5px;top:6px;right:6px}.g-like::before{inset:-6px -4px}.g-zoom{bottom:6px;right:6px}.g-check{top:6px;left:6px}}
+@media (max-width:767px){.g-like,.g-remove{top:6px;right:6px}.g-zoom{bottom:6px;right:6px}.g-check{top:6px;left:6px}}
 @media (prefers-reduced-motion:reduce){.g-open::after{transition:none}}
 .g-more{display:flex;justify-content:center;margin-top:24px}
 .g-none{padding:48px 0;text-align:center;color:var(--muted)}
+/* 맞는 사진이 적어 나머지로 채운 검색: 맞는 사진 → "다른 사진" 구분 줄 → 채운 사진 (두 masonry 묶음) */
+.g-divider{display:flex;align-items:center;gap:16px;margin:32px 0 16px;color:var(--muted);font-size:14px;font-weight:600}
+.g-divider::before,.g-divider::after{content:"";flex:1;height:1px;background:var(--line)}
+.g-note{margin:4px 0 16px;color:var(--muted);font-size:15px;text-align:center}
+@media (max-width:767px){.g-divider{margin:24px 0 12px}.g-note{font-size:14px;margin:0 0 12px}}
 /* 담은 사진이 있으면 아래에 고르러 가는 줄 */
 .g-finish{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;justify-content:center;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1px solid var(--line)}
 .g-finish .g-btn{min-height:48px;font-size:15px;padding:0 28px;max-width:100%}
@@ -191,7 +204,7 @@ body.has-finish #main{padding-bottom:80px}
   box-shadow:0 0 0 100vmax var(--bg),0 1px 0 100vmax var(--line);clip-path:inset(0 -100vmax -1px)}
 .g-title{font-size:20px;font-weight:700}
 .g-title b{font-variant-numeric:tabular-nums}
-.g-guide{margin:0 0 16px;color:var(--muted);font-size:15px}
+.g-guide{margin:0 0 16px;color:var(--muted);font-size:15px;word-break:keep-all}
 #saved{margin-bottom:96px}
 .g-decide{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;justify-content:center;align-items:center;gap:16px;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1px solid var(--line)}
 .g-decide .g-btn{min-height:48px;padding:0 28px}
@@ -202,7 +215,7 @@ body.has-finish #main{padding-bottom:80px}
 .pv-side [data-close]{align-self:flex-end}
 .pv-act{margin-top:8px}
 .pv-act>*{width:100%}
-.pv-nav{margin-top:auto;display:flex;gap:8px}
+.pv-nav{display:flex;gap:8px}
 .pv-nav .btn{flex:1}
 .g-like-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;background:var(--sec);color:var(--ink);border-radius:var(--pill);min-height:48px;padding:0 22px;cursor:pointer;font-weight:700;font-size:15px;white-space:nowrap}
 .g-like-btn:hover{background:var(--sec-press)}
@@ -231,15 +244,24 @@ body.has-finish #main{padding-bottom:80px}
 .g-done h1{font-size:20px;font-weight:600}
 .g-done-kicker{color:var(--muted);font-weight:600;font-size:14px}
 .g-call{font-size:30px;font-weight:700;color:var(--ink);letter-spacing:-.01em;margin-top:10px}
-.g-next{margin-top:16px;border:0;background:transparent;color:var(--muted);border-radius:var(--pill);padding:6px 12px;font-size:12px;cursor:pointer;opacity:.7}
-.g-next:hover{opacity:1;color:var(--ink);background:var(--card)}
 /* 시작 화면 */
 #start-form{width:min(440px,100%);display:flex;flex-direction:column;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:32px}
 #start-form label{margin-top:10px;font-weight:600}
 #pid-in,#who-in{font-size:18px;min-height:52px;padding:0 16px}
 #start-form .row{margin-top:18px}
+#start-form[aria-busy=true] input{background:var(--card);color:var(--muted)}
+.start-wait{margin-top:10px;color:var(--muted);font-size:14px}
 /* 연구자 화면: 진행 중 참여자 경과 */
 .live{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+/* 진행 중 참여자: 이름표 + 숫자 칸 다섯(경과·검색·담은 사진·노출·크게 보기) + 15분 알림 + 버튼 */
+.live-box{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.live-who{font-size:13px;color:var(--muted);white-space:nowrap}
+.live-who b{color:var(--ink);font-size:15px}
+.live-cells{display:flex;gap:4px}
+.live-cell{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:56px;padding:5px 10px;border-radius:var(--r);background:var(--card);line-height:1.2}
+.live-cell span{font-size:11px;color:var(--muted);white-space:nowrap}
+.live-cell b{font-size:15px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+@media (max-width:767px){.live-cell{min-width:0;padding:4px 8px}.live-cell b{font-size:14px}}
 .live-over{display:inline-flex;align-items:center;gap:6px;background:var(--research-soft);color:var(--research);border:1px solid var(--research);border-radius:var(--pill);padding:3px 10px;font-size:12px;font-weight:700}
 .g-strip{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 4px}
 .g-strip figure{margin:0;flex:0 0 160px;display:flex;flex-direction:column;gap:6px}
@@ -327,9 +349,15 @@ const SYN = {
 };
 const MAX_EDGE = 1600, THUMB_EDGE = 420;
 // 앱 버전: 기록마다 붙는다. 화면·기록 방식을 바꾸면 날짜와 순번을 올린다
-const APP_VERSION = '2026-10-27.4';
-// 참여자 화면의 과제 안내 한 줄 (검색 그룹 진행 대본의 과제 문장 + 하트 안내)
-const TASK_LINE = '다음에 혼자 지낼 방으로 가장 마음에 드는 방을 정해 주세요. 마음에 드는 사진은 하트를 눌러 담아 주세요.';
+const APP_VERSION = '2026-10-27.5';
+// 참여자 화면의 과제 안내 한 줄 (검색 그룹 진행 대본의 과제 문장 + 하트 안내). 동작 이름은 "담기", 모은 사진은 "담은 사진"으로 통일
+const TASK_LINE = '다음에 혼자 지낼 방으로 가장 마음에 드는 사진을 한 장 골라 주세요. 마음에 드는 사진은 하트를 눌러 담아 두세요.';
+// 첫 화면 검색창 아래 시작 단어 (모든 참여자에게 같은 순서, 바꾸지 않는다).
+// 고른 기준: 이 말로 검색했을 때 상위 24장에 든 타깃 요소 D(식물·러그·스탠드 조명·벽 그림·겹친 침구·담요) 수의 평균이
+// 풀 전체 평균(2.98/5)과 비슷한 말. D 단어(식물·러그·액자·스탠드·담요 등)와 D가 많이 걸리는 말(아늑한·화이트·미니멀 등)은 일부러 뺐다.
+// 시작 단어가 특정 요소 쪽으로 노출을 기울이지 않게 하려는 것. 누른 검색은 queries[].via = 'chip'으로 남는다
+const taskHTML = () => TASK_LINE.split(/(?<=\.) /).map(x => `<span>${esc(x)}</span>`).join(' ');
+const STARTER_CHIPS = ['모던', '따뜻한', '베이지', '우드', '햇살', '고급스러운', '그레이', '넓은'];
 
 /* ================= 저장소 ================= */
 const DB = (() => {
@@ -480,27 +508,41 @@ function render(){
   if (tab === 'archive') renderArchive(); else renderPool();
 }
 
-// 연구자 화면 오른쪽 위: 진행 중인 참여자, 경과 시간(1초마다 갱신), 검색·담기·노출 수, 15분 지나면 진행자용 알림
+// 연구자 화면 오른쪽 위: 진행 중인(또는 방금 끝낸) 참여자와 숫자 칸 다섯(경과·검색·담은 사진·노출·크게 보기, 1초마다 갱신),
+// 첫 검색 후 15분이 지나면 진행자용 알림. 검색 창에서 참여자가 결정을 마치면 "다음 참여자 받기"가 나온다 (검색 창을 시작 화면으로)
 const OVER_MIN = 15;
+const LIVE_CELLS = [['el', '경과'], ['q', '검색'], ['like', '담은 사진'], ['imp', '노출'], ['pv', '크게 보기']];
 function renderTopRight(){
-  const inProgress = !!P.pid && !P.final;
+  const inProgress = !!P.pid && !P.final, finished = RESEARCH_PAGE && !!P.pid && !!P.final;
+  const cells = `<div class="live-cells">${LIVE_CELLS.map(([k, l]) => `<div class="live-cell"><span>${l}</span><b id="lv-${k}">—</b></div>`).join('')}</div>`;
+  const who = `<span class="live-who" id="live">${finished ? '결정 마침' : '진행 중'} <b>${esc(P.pid || '')}</b></span>`;
   $('#topright').innerHTML = RESEARCH_PAGE
-    ? `<div class="row">${inProgress ? `<span class="small muted">검색 화면 진행 중 <b>${esc(P.pid)}</b> · <span class="live" id="live"></span></span><span class="live-over" id="live-over" hidden></span><button class="btn sm danger" id="abort" type="button">미완료로 끝내기</button>` : ''}<a class="btn primary sm" href="?view=search" target="_blank" rel="noopener">검색 화면 열기 ↗</a></div>`
-    : `<div class="row">${inProgress ? `<span class="small muted live" id="live"></span><span class="live-over" id="live-over" hidden></span><button class="btn sm" id="resume" type="button">${esc(P.pid)} 이어서 진행</button>` : ''}<button class="btn primary sm" id="open-search" type="button">새 참여자 시작</button></div>`;
+    ? `<div class="live-box">${inProgress || finished ? who + cells + '<span class="live-over" id="live-over" hidden></span>' : ''}${inProgress ? '<button class="btn sm danger" id="abort" type="button">미완료로 끝내기</button>' : ''}${finished ? '<button class="btn primary sm" id="next-up" type="button">다음 참여자 받기</button>' : ''}<a class="btn ${finished ? '' : 'primary '}sm" href="?view=search" target="_blank" rel="noopener">검색 화면 열기 ↗</a></div>`
+    : `<div class="live-box">${inProgress ? who + cells + `<span class="live-over" id="live-over" hidden></span><button class="btn sm" id="resume" type="button">${esc(P.pid)} 이어서 진행</button>` : ''}<button class="btn primary sm" id="open-search" type="button">새 참여자 시작</button></div>`;
   const os = $('#open-search'); if (os) os.onclick = askParticipantId;
   const rs = $('#resume'); if (rs) rs.onclick = () => { S.mode = 'search'; render(); };
   const ab = $('#abort'); if (ab) ab.onclick = () => {
     if (!ab.dataset.sure){ ab.dataset.sure = 1; ab.textContent = '한 번 더 누르면 끝내기'; setTimeout(() => { if (ab.isConnected){ delete ab.dataset.sure; ab.textContent = '미완료로 끝내기'; } }, 4000); return; }
     reloadPick(); resetSession(); render();
   };
+  // 다음 참여자 받기: 검색 창에 신호(rs_next_up)를 보내 검색 창이 스스로 시작 화면으로 간다.
+  // 1.5초 뒤에도 그대로면(검색 창이 닫혀 있음) 이 창에서 진행 상태를 비운다 (기록은 결정 때 이미 남아 있어 새로 생기지 않는다)
+  const nx = $('#next-up'); if (nx) nx.onclick = () => {
+    const pid = P.pid, fin = P.final; nx.disabled = true; nx.textContent = '넘기는 중…';
+    LS.set(NEXT_KEY, {at: Date.now(), pid, final: fin, by: TAB_ID});
+    setTimeout(() => { reloadPick(); if (P.pid === pid && P.final === fin){ resetSession(); } renderTopRight(); }, 1500);
+  };
   updateLive();
 }
 function updateLive(){
-  const el = $('#live'); if (!el) return;
-  const now = Date.now(), t0 = P.sessionAt || P.startedAt, t1 = P.startedAt;
+  if (!$('#lv-el')) return;
+  const now = P.final && P.finishedAt ? Date.parse(P.finishedAt) : Date.now(), t0 = P.sessionAt || P.startedAt, t1 = P.startedAt;
   const imp = (P.shows || []).reduce((a, e) => a + e.ids.length, 0);
-  el.textContent = `시작 후 ${t0 ? fmt(now - Date.parse(t0)) : '—'} · 첫 검색 후 ${t1 ? fmt(now - Date.parse(t1)) : '—'} · 검색 ${(P.queries || []).length} · 담은 사진 ${P.liked.length} · 노출 ${imp} · 크게 보기 ${(P.previews || []).length}`;
-  const base = t1 || t0, over = base && now - Date.parse(base) >= OVER_MIN * 60000;
+  // 경과 = 첫 검색(또는 첫 담기) 뒤 시간. 그 전에는 시작 버튼 뒤 시간을 흐리게 보여 준다. 결정을 마치면 그 시각에서 멈춘다
+  const el = $('#lv-el'); el.textContent = t1 ? fmt(now - Date.parse(t1)) : t0 ? fmt(now - Date.parse(t0)) : '—'; el.style.color = t1 ? '' : 'var(--muted)';
+  el.parentElement.title = `시작 후 ${t0 ? fmt(now - Date.parse(t0)) : '—'} · 첫 검색 후 ${t1 ? fmt(now - Date.parse(t1)) : '—'}`;
+  $('#lv-q').textContent = (P.queries || []).length; $('#lv-like').textContent = P.liked.length; $('#lv-imp').textContent = imp; $('#lv-pv').textContent = (P.previews || []).length;
+  const base = t1 || t0, over = !P.final && base && now - Date.parse(base) >= OVER_MIN * 60000;
   const o = $('#live-over'); if (o){ o.hidden = !over; o.textContent = `${OVER_MIN}분 지남 · 진행자 확인`; }
 }
 setInterval(() => { if (S.mode !== 'search') updateLive(); }, 1000);
@@ -760,7 +802,7 @@ async function syncDefaultPool(force){
 
 /* ---------- 참여자 검색 화면 ---------- */
 const photoById = id => S.photos.find(p => p.id === id);
-// 참여자 진행 상태: 마음에 든 사진, 최종 사진, 지금 보는 화면, 마지막 검색어, 노출 기록 (새로고침해도 유지)
+// 참여자 진행 상태: 담은 사진, 최종 사진, 지금 보는 화면, 마지막 검색어, 노출 기록 (새로고침해도 유지)
 const PICK_KEY = 'rs_pick';
 const pickDefault = () => ({liked: [], final: null, view: 'search', startedAt: null, finishedAt: null});
 const P = Object.assign(pickDefault(), LS.get(PICK_KEY, {}));
@@ -780,7 +822,8 @@ const curQ = () => { const qs = P.queries || [], qn = qs.length; return {qn, q: 
 function logShow(source, list, from){
   if (P.final || !list.length) return null;
   const {qn, q} = curQ(), m = S.resultMeta || {};
-  const e = {n: (P.shows || []).length + 1, qn, q, at: nowIso(), source, from, ids: list.map(p => p.id), padded: !!m.padded, hits: m.hits ?? null, total: S.results.length, vis: {}, sz: {}, vw: window.innerWidth, vh: window.innerHeight};
+  const via = qn ? ((P.queries || [])[qn - 1] || {}).via || null : null; // 이 결과를 낸 검색이 직접 입력(typed)인지 시작 단어(chip)인지 (2026-10-27.5부터)
+  const e = {n: (P.shows || []).length + 1, qn, q, via, at: nowIso(), source, from, ids: list.map(p => p.id), padded: !!m.padded, hits: m.hits ?? null, total: S.results.length, vis: {}, sz: {}, vw: window.innerWidth, vh: window.innerHeight};
   (P.shows = P.shows || []).push(e); savePick(); return e;
 }
 // 그린 칸의 실제 크기(px, [너비, 높이])를 그 사진을 처음 그린 묶음에 적는다 (면적으로 가중한 노출 계산용)
@@ -832,7 +875,7 @@ const heart = (n = 18) => `<svg class="hrt" viewBox="0 0 24 24" width="${n}" hei
 const HEART = heart(18);
 const likeText = id => isLiked(id) ? '담김' : '담기';
 function syncLikes(){
-  $$('[data-like]').forEach(b => { const on = isLiked(b.dataset.like); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.setAttribute('aria-label', on ? '마음에 든 사진에서 빼기' : '마음에 든 사진에 담기'); });
+  $$('[data-like]').forEach(b => { const on = isLiked(b.dataset.like); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.setAttribute('aria-label', on ? '담김' : '담기'); });
   $$('.g-saved-count').forEach(n => n.textContent = P.liked.length);
   $$('.g-saved').forEach(n => n.classList.toggle('has', P.liked.length > 0));
   $$('[data-like-label]').forEach(n => n.textContent = likeText(n.dataset.likeLabel));
@@ -853,15 +896,16 @@ function syncFinishBar(){
   document.body.classList.add('has-finish');
 }
 const goSaved = () => { P.view = 'saved'; P._sel = null; savePick(); renderSearchUI(); window.scrollTo(0,0); };
-const savedBtn = () => `<button class="g-saved ${P.liked.length ? 'has' : ''}" id="to-saved" type="button" aria-label="마음에 든 사진 보기">${heart(16)}<span class="lbl">마음에 든 사진</span><b class="g-saved-count">${P.liked.length}</b></button>`;
+const savedBtn = () => `<button class="g-saved ${P.liked.length ? 'has' : ''}" id="to-saved" type="button" aria-label="담은 사진 보기">${heart(16)}<span class="lbl">담은 사진</span><b class="g-saved-count">${P.liked.length}</b></button>`;
+const XICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
 const MAG = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M10.5 4a6.5 6.5 0 0 1 5.2 10.4l4.4 4.4-1.4 1.4-4.4-4.4A6.5 6.5 0 1 1 10.5 4zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z" fill="currentColor"/></svg>';
 const CHECK = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const searchForm = (val) => `<form class="g-form" id="gform" role="search"><button class="g-go" type="submit" aria-label="검색">${MAG}</button><input type="search" id="q" aria-label="검색어" autocomplete="off" enterkeyhint="search"${val ? ` value="${esc(val)}"` : ''}></form>`;
 function tile(p, mode, rank){
   return `<div class="g-item${mode==='pick' && P._sel===p.id ? ' sel' : ''}" data-id="${p.id}"${rank ? ` data-rank="${rank}"` : ''}>
     <button class="g-open" type="button" aria-label="${mode==='pick' ? '이 사진 고르기' : '크게 보기'}"><img loading="lazy" alt="방 사진" src="${urlFor(p,'thumb')}"></button>
-    ${mode==='pick' ? `<button class="g-zoom" type="button" data-zoom="${p.id}" aria-label="크게 보기">${MAG}</button><span class="g-check" aria-hidden="true">${CHECK}</span>` : ''}
-    <button class="g-like${isLiked(p.id) ? ' on' : ''}" type="button" data-like="${p.id}" aria-pressed="${isLiked(p.id)}" aria-label="${isLiked(p.id) ? '마음에 든 사진에서 빼기' : '마음에 든 사진에 담기'}">${HEART}<span data-like-label="${p.id}">${likeText(p.id)}</span></button>
+    ${mode==='pick' ? `<button class="g-zoom" type="button" data-zoom="${p.id}" aria-label="크게 보기">${MAG}</button><span class="g-check" aria-hidden="true">${CHECK}</span><button class="g-remove" type="button" data-remove="${p.id}" aria-label="담은 사진에서 빼기">${XICON}</button>`
+      : `<button class="g-like${isLiked(p.id) ? ' on' : ''}" type="button" data-like="${p.id}" aria-pressed="${isLiked(p.id)}" aria-label="${likeText(p.id)}">${HEART}</button>`}
   </div>`;
 }
 /* 사진 칸 쌓기 (masonry): 열 수는 창 너비로 정하고(1440↑ 5, 1024↑ 4, 768↑ 3, 그 아래 2), 순위 순서대로 가장 짧은 열(같으면 왼쪽)에 놓는다.
@@ -916,6 +960,13 @@ function bindLikeButtons(root){ $$('[data-like]', root).forEach(b => b.onclick =
 // 검색 실행 (같은 검색어·시드면 늘 같은 결과라 새로고침 뒤에도 그대로 복원된다)
 function doSearch(q){ const r = runSearch(q, 'pilot'); S.lastQuery = q; S.results = r.list; S.resultMeta = {hits: r.hits, padded: r.padded}; return r; }
 
+// 검색 한 번: 검색창에 쳐서(typed) 또는 첫 화면 시작 단어를 눌러서(chip). 둘 다 똑같이 검색하고 queries[].via에 어디서 왔는지 남긴다
+function submitQuery(q, via){
+  if (!q) return;
+  const r = doSearch(q); S.resultLimit = 30;
+  if (!P.final){ (P.queries = P.queries || []).push({q, at: nowIso(), hits: r.hits, padded: r.padded, via}); if (!P.startedAt) P.startedAt = nowIso(); P.lastQ = q; P.resultLimit = 30; savePick(); }
+  S.nextSource = 'search'; renderSearchUI(); window.scrollTo(0,0);
+}
 function renderSearchUI(){
   document.body.classList.add('search-mode');
   $('#brand').textContent = ''; $('#topright').innerHTML = '';
@@ -927,40 +978,45 @@ function renderSearchUI(){
   const source = S.nextSource || 'rerender'; S.nextSource = null;
   if (!S.lastQuery){
     $('#main').innerHTML = `<div class="g-bar g-bar-home">${savedBtn()}</div><div class="g-home">
-      <p class="g-task">${esc(TASK_LINE)}</p>
-      ${searchForm('')}</div>`;
+      <p class="g-task">${taskHTML()}</p>
+      ${searchForm('')}
+      <ul class="g-chips" aria-label="검색어 예">${STARTER_CHIPS.map(c => `<li><button class="g-chip" type="button" data-chip="${esc(c)}">${esc(c)}</button></li>`).join('')}</ul></div>`;
+    $$('[data-chip]').forEach(b => b.onclick = () => submitQuery(b.dataset.chip, 'chip'));
   } else {
     $('#main').innerHTML = `<header class="g-top">
       ${searchForm(S.lastQuery)}${savedBtn()}
-      <p class="g-task sm">${esc(TASK_LINE)}</p></header>
-      <div class="g-grid" id="results"></div>
+      <p class="g-task sm">${taskHTML()}</p></header>
+      <div class="g-results" id="results"></div>
       <div class="g-more"><button class="btn lg" id="more" type="button" hidden>결과 더 보기</button></div>`;
     $('#more').onclick = () => { const before = Math.min(S.resultLimit, S.results.length); S.resultLimit += 30; P.resultLimit = S.resultLimit; savePick(); drawResults('more', before); };
     drawResults(source);
   }
   $('#to-saved').onclick = goSaved;
-  $('#gform').onsubmit = e => {
-    e.preventDefault(); const q = $('#q').value.trim(); if (!q) return;
-    const r = doSearch(q); S.resultLimit = 30;
-    if (!P.final){ (P.queries = P.queries || []).push({q, at: nowIso(), hits: r.hits, padded: r.padded}); if (!P.startedAt) P.startedAt = nowIso(); P.lastQ = q; P.resultLimit = 30; savePick(); }
-    S.nextSource = 'search'; renderSearchUI(); window.scrollTo(0,0);
-  };
+  $('#gform').onsubmit = e => { e.preventDefault(); submitQuery($('#q').value.trim(), 'typed'); };
   if (!S.lastQuery) $('#q').focus();
   finishRender();
 }
 function drawResults(source, before){
   const box = $('#results'); if (!box) return;
   const shown = S.results.slice(0, S.resultLimit);
-  if (!shown.length){ box.style.height = ''; box.innerHTML = '<p class="g-none">검색 결과가 없습니다.</p>'; $('#more').hidden = true; return; }
-  box.innerHTML = shown.map((p, i) => tile(p, 'search', i + 1)).join('');
+  if (!shown.length){ box.innerHTML = '<p class="g-none">검색 결과가 없습니다.</p>'; $('#more').hidden = true; return; }
+  // 맞는 사진이 적어 나머지로 채웠으면: 맞는 사진 묶음 → "다른 사진" 구분 줄 → 채운 사진 묶음 (masonry 두 개, 순위는 이어서 매김)
+  // 맞는 사진이 하나도 없으면 구분 줄 대신 짧은 안내 한 줄 뒤에 채운 사진
+  const m = S.resultMeta || {}, nHit = m.padded ? Math.min(m.hits || 0, shown.length) : shown.length;
+  const block = (list, from) => `<div class="g-grid">${list.map((p, i) => tile(p, 'search', from + i)).join('')}</div>`;
+  box.style.minHeight = box.offsetHeight + 'px'; // 다시 그리는 동안 높이를 붙잡아 둔다 (결과 더 보기에서 스크롤이 위로 튀지 않게)
+  box.innerHTML = nHit === shown.length ? block(shown, 1)
+    : nHit === 0 ? `<p class="g-note">맞는 사진이 없어 다른 사진을 보여 드려요</p>${block(shown, 1)}`
+    : `${block(shown.slice(0, nHit), 1)}<div class="g-divider" role="separator">다른 사진</div>${block(shown.slice(nHit), nHit + 1)}`;
   // 노출 기록: 결과 더 보기면 새로 붙은 사진만, 그 밖에는 그린 사진 전부를 한 묶음으로
   if (source === 'more'){ const e = logShow('more', shown.slice(before), before + 1); if (e) e.ids.forEach(id => S.owner[id] = e.n); }
   else { const e = logShow(source, shown, 1); S.owner = {}; if (e) e.ids.forEach(id => S.owner[id] = e.n); }
   bindLikeButtons(box);
   $$('.g-item', box).forEach(t => t.querySelector('.g-open').onclick = () => openPreview(t.dataset.id, shown, false, 'click'));
   $('#more').hidden = S.results.length <= S.resultLimit;
-  // 칸 배치(사진 비율로 높이를 미리 정함) → 바로 칸 크기 재기. 다시 배치될 때(창 크기·비율 보정)마다 다시 잰다
-  masonry(box, () => measureTiles(box));
+  // 칸 배치(사진 비율로 높이를 미리 정함) → 바로 칸 크기 재기. 다시 배치될 때(창 크기·비율 보정)마다 다시 잰다 (두 묶음 모두)
+  $$('.g-grid', box).forEach(g => masonry(g, () => measureTiles(box)));
+  box.style.minHeight = '';
   observeTiles(box);
 }
 
@@ -969,19 +1025,46 @@ function renderSavedUI(){
   if (P._sel && !P.liked.includes(P._sel)) P._sel = null;
   $('#main').innerHTML = `<header class="g-head">
       <button class="btn" id="back" type="button">← 검색으로 돌아가기</button>
-      <h1 class="g-title">마음에 든 사진 <b>${list.length}</b></h1></header>
-    ${list.length ? `<p class="muted g-guide">이 중에서 다음에 혼자 지낼 방으로 가장 마음에 드는 사진 한 장을 골라 주세요. 하트를 누르면 목록에서 빠져요.</p>
+      <h1 class="g-title">담은 사진 <b>${list.length}</b></h1></header>
+    ${list.length ? `<p class="muted g-guide">담은 사진 중에서 다음에 혼자 지낼 방으로 가장 마음에 드는 사진을 한 장 골라 주세요. 필요 없는 사진은 ×를 눌러 뺄 수 있어요.</p>
       <div class="g-grid g-pick" id="saved">${list.map(p => tile(p, 'pick')).join('')}</div>
       <div class="g-decide"><span class="muted" id="sel-hint">${P._sel ? '고른 사진: 1장' : '사진을 눌러 한 장을 고르세요'}</span><button class="g-btn" id="decide" type="button" ${P._sel ? '' : 'disabled'}>이 사진으로 결정</button></div>`
-    : `<div class="empty">아직 담은 사진이 없어요.<br>검색 결과에서 하트를 눌러 마음에 드는 사진을 담아 보세요.</div>`}`;
+    : `<div class="empty">아직 담은 사진이 없어요.<br>검색 결과에서 하트를 눌러 사진을 담아 두세요.</div>`}`;
   $('#back').onclick = () => { P.view = 'search'; savePick(); S.nextSource = 'return'; renderSearchUI(); };
   const box = $('#saved'); if (!box) return;
-  masonry(box); bindLikeButtons(box);
+  masonry(box);
+  $$('[data-remove]', box).forEach(b => b.onclick = e => { e.stopPropagation(); removeSaved(b.dataset.remove); });
   $$('.g-item', box).forEach(t => {
     t.querySelector('.g-open').onclick = () => { P._sel = t.dataset.id; savePick(); $$('.g-item', box).forEach(x => x.classList.toggle('sel', x === t)); $('#decide').disabled = false; $('#sel-hint').textContent = '고른 사진: 1장'; };
   });
   $$('[data-zoom]', box).forEach(b => b.onclick = e => { e.stopPropagation(); openPreview(b.dataset.zoom, list, true, 'click'); });
   $('#decide').onclick = confirmFinal;
+}
+// 모아 보기에서 ×로 빼기: 바로 빼고 5초 동안 "되돌리기"를 보여 준다. 되돌리면 같은 자리로 돌아온다
+// likeLog: 빼기 = {action:'빼기', where:'모아 보기'}, 되돌리기 = {action:'담기', where:'되돌리기'} (likedRef는 되돌리기를 건너뛰어 처음 담은 검색을 그대로 쓴다)
+function removeSaved(id){
+  if (P.final) return;
+  const i = P.liked.indexOf(id); if (i < 0) return;
+  const {qn, q} = curQ(), wasSel = P._sel === id;
+  (P.likeLog = P.likeLog || []).push({action: '빼기', id, at: nowIso(), qn, q, where: '모아 보기'});
+  P.liked.splice(i, 1); if (wasSel) P._sel = null;
+  savePick(); renderSearchUI();
+  undoToast('사진을 뺐어요', '되돌리기', () => {
+    if (P.final || P.liked.includes(id)) return;
+    const c = curQ();
+    P.likeLog.push({action: '담기', id, at: nowIso(), qn: c.qn, q: c.q, where: '되돌리기'});
+    P.liked.splice(Math.min(i, P.liked.length), 0, id); if (wasSel && !P._sel) P._sel = id;
+    savePick(); if (P.view === 'saved') renderSearchUI(); else syncLikes();
+  });
+}
+let undoEl = null;
+function undoToast(msg, label, onUndo, ms = 5000){
+  if (undoEl) undoEl.remove();
+  const t = document.createElement('div'); t.className = 'toast undo'; t.setAttribute('role', 'status');
+  t.innerHTML = `<span>${esc(msg)} ·</span><button type="button">${esc(label)}</button>`;
+  document.body.appendChild(t); undoEl = t;
+  const timer = setTimeout(() => { t.remove(); if (undoEl === t) undoEl = null; }, ms);
+  $('button', t).onclick = () => { clearTimeout(timer); t.remove(); undoEl = null; onUndo(); };
 }
 function confirmFinal(){
   const p = photoById(P._sel); if (!p) return;
@@ -1008,20 +1091,34 @@ function renderDoneUI(){
     <p class="g-done-kicker">선택을 마쳤습니다</p>
     <h1>다음에 혼자 지낼 방으로 고른 사진</h1>
     ${p ? `<img alt="최종으로 고른 사진" src="${urlFor(p,'full')}">` : '<p class="muted">사진을 찾을 수 없습니다.</p>'}
-    <p class="g-call">진행자를 불러 주세요.</p>
-    <button class="g-next" id="to-manager" type="button">다음 참여자</button></div>`;
-  $('#to-manager').onclick = () => { if (SEARCH_PAGE) S.nextUp = true; else S.mode = null; render(); window.scrollTo(0,0); };
+    <p class="g-call">진행자를 불러 주세요.</p></div>`;
 }
+// 다음 참여자로: 연구자 창의 "다음 참여자 받기"(rs_next_up 신호) 또는 완료 화면에서 Ctrl+Shift+N(연구자 창이 없을 때). 참여자 화면에는 버튼이 없다
+// 기록은 결정 순간 이미 남았으므로(archivedId) resetSession이 다시 남기지 않는다
+function nextParticipant(){
+  if (!P.final) return;
+  if (SEARCH_PAGE){ resetSession(); S.nextUp = false; } else S.mode = null;
+  render(); window.scrollTo(0,0);
+}
+const NEXT_KEY = 'rs_next_up';
+document.addEventListener('keydown', e => {
+  if (e.shiftKey && (e.ctrlKey || e.altKey) && e.code === 'KeyN' && S.mode === 'search' && P.final && !$('.modal')){ e.preventDefault(); nextParticipant(); }
+});
 // 검색 화면 전용 시작 화면: 연구자가 진행자·참여자 ID를 넣고 참여자에게 넘긴다
+// 사진 풀을 맞추는 동안(S.poolReady 전)에는 입력칸·시작 버튼을 막는다 (불러오기가 끝나 다시 그릴 때 친 글자가 지워지지 않게).
+// 다시 그릴 때도 이미 친 글자는 그대로 옮긴다
 function renderStartUI(){
-  $('#main').innerHTML = `<div class="g-home"><form class="panel g-confirm" id="start-form" aria-label="참여자 시작">
+  const old = {who: $('#who-in') ? $('#who-in').value : null, pid: $('#pid-in') ? $('#pid-in').value : ''};
+  const off = S.poolReady ? '' : ' disabled';
+  $('#main').innerHTML = `<div class="g-home"><form class="panel g-confirm" id="start-form" aria-label="참여자 시작" aria-busy="${!S.poolReady}">
     <h2>참여자 시작</h2>
-    <label class="small muted" for="who-in">진행자</label><input type="text" id="who-in" value="${esc(LS.get(WHO_KEY, ''))}" placeholder="예: 의현" autocomplete="off">
-    <label class="small muted" for="pid-in">참여자 ID</label><input type="text" id="pid-in" placeholder="예: P03" autocomplete="off" required>
-    <div class="row" style="justify-content:flex-end"><button class="g-btn" type="submit" style="min-height:48px;padding:0 28px">시작</button></div></form></div>`;
-  const inp = $('#pid-in'); inp.focus();
+    <label class="small muted" for="who-in">진행자</label><input type="text" id="who-in" value="${esc(old.who ?? LS.get(WHO_KEY, ''))}" placeholder="예: 의현" autocomplete="off"${off}>
+    <label class="small muted" for="pid-in">참여자 ID</label><input type="text" id="pid-in" value="${esc(old.pid)}" placeholder="예: P03" autocomplete="off" required${off}>
+    ${S.poolReady ? '' : '<p class="start-wait" role="status">사진을 불러오는 중이에요. 끝나면 입력할 수 있어요.</p>'}
+    <div class="row" style="justify-content:flex-end"><button class="g-btn" type="submit" style="min-height:48px;padding:0 28px"${off}>시작</button></div></form></div>`;
+  const inp = $('#pid-in'); if (S.poolReady) inp.focus();
   $('#start-form').onsubmit = e => {
-    e.preventDefault(); const id = inp.value.trim(); if (!id){ inp.focus(); return; }
+    e.preventDefault(); if (!S.poolReady) return; const id = inp.value.trim(); if (!id){ inp.focus(); return; }
     LS.set(WHO_KEY, $('#who-in').value.trim());
     resetSession(); P.pid = id; P.sessionAt = nowIso(); savePick(); S.nextUp = false; renderSearchUI(); window.scrollTo(0,0);
   };
@@ -1046,7 +1143,7 @@ function openPreview(id, list, fromSaved, via){
   m.innerHTML = `<div class="panel pv" role="dialog" aria-modal="true" aria-label="이미지 크게 보기">
     <div class="pv-side">
       <button class="btn" data-close type="button">닫기</button>
-      <div class="pv-act">${fromSaved ? `<button class="g-btn" id="pick-this" type="button" style="min-height:48px">이 사진 고르기</button>` : `<button class="g-like-btn${isLiked(id) ? ' on' : ''}" type="button" data-like="${id}" aria-pressed="${isLiked(id)}" aria-label="${isLiked(id) ? '마음에 든 사진에서 빼기' : '마음에 든 사진에 담기'}">${heart(20)}<span data-like-label="${id}">${likeText(id)}</span></button>`}</div>
+      <div class="pv-act">${fromSaved ? `<button class="g-btn" id="pick-this" type="button" style="min-height:48px">이 사진 고르기</button>` : `<button class="g-like-btn${isLiked(id) ? ' on' : ''}" type="button" data-like="${id}" aria-pressed="${isLiked(id)}">${heart(20)}<span data-like-label="${id}">${likeText(id)}</span></button>`}</div>
       <div class="pv-nav"><button class="btn" type="button" data-nav="-1" ${i <= 0 ? 'disabled' : ''}>← 이전</button><button class="btn" type="button" data-nav="1" ${i >= list.length - 1 ? 'disabled' : ''}>다음 →</button></div>
     </div>
     <img class="pv-img" alt="방 사진" src="${urlFor(p,'full')}"></div>`;
@@ -1097,7 +1194,7 @@ const reloadArch = () => { ARCH = LS.get(ARCH_KEY, []); }; // 고치기 전에 �
 const WHO_KEY = 'rs_researcher'; // 이 PC의 진행자 이름. 기록마다 붙어 나중에 세 사람 기록을 합칠 때 구분한다
 const fileTag = () => { const w = LS.get(WHO_KEY, '').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 20); return (w ? w + '_' : '') + new Date().toISOString().slice(0,10); };
 const refOf = id => { const p = photoById(id); return {id, name: p ? p.name : id}; };
-const likedRef = id => { const add = (P.likeLog || []).filter(e => e.id === id && e.action === '담기').pop(); return Object.assign(refOf(id), add ? {qn: add.qn, q: add.q, likedAt: add.at} : {}); };
+const likedRef = id => { const add = (P.likeLog || []).filter(e => e.id === id && e.action === '담기' && e.where !== '되돌리기').pop(); return Object.assign(refOf(id), add ? {qn: add.qn, q: add.q, likedAt: add.at} : {}); };
 function archiveCurrent(status){
   reloadArch();
   const who = LS.get(WHO_KEY, '');
@@ -1158,9 +1255,9 @@ function renderArchive(){
         <div class="row">${r.final && photoById(r.final.id) ? `<a class="btn sm" href="${urlFor(photoById(r.final.id),'full')}" download="P${r.no}_FINAL_${esc(r.final.name.replace(/\.[^.]+$/, ''))}.jpg">최종 사진 저장</a>` : ''}${sheetCfg().url ? `<button class="btn sm" data-sheet="${r.id}" type="button" ${r.sheet && r.sheet.state === 'sending' && (r.sheet.until || 0) > Date.now() ? 'disabled' : ''}>${r.sheet ? '시트로 다시 보내기' : '시트로 보내기'}</button>` : ''}<button class="btn sm danger" data-del="${r.id}" type="button">기록 삭제</button></div>
       </div>
       <dl class="kv"><dt>진행자</dt><dd>${esc(r.researcher || '—')}</dd><dt>${r.status === '완료' ? '결정 시각' : '기록 시각'}</dt><dd class="mono">${fmtTime(r.finishedAt)} (첫 검색부터 ${durMin(r)})</dd>
-        <dt>검색어 (${(r.queries || []).length}회)</dt><dd>${(r.queries || []).length ? `<ol class="q-list">${r.queries.map(x => `<li><span class="mono small muted">${new Date(x.at).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'})}</span> ${esc(x.q)}${x.hits != null ? ` <span class="small muted">· 일치 ${x.hits}장${x.padded ? ' · 나머지 사진으로 채움' : ''}</span>` : ''}</li>`).join('')}</ol>` : '—'}</dd>
+        <dt>검색어 (${(r.queries || []).length}회)</dt><dd>${(r.queries || []).length ? `<ol class="q-list">${r.queries.map(x => `<li><span class="mono small muted">${new Date(x.at).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'})}</span> ${esc(x.q)}${x.hits != null ? ` <span class="small muted">· 일치 ${x.hits}장${x.padded ? ' · 나머지 사진으로 채움' : ''}${x.via === 'chip' ? ' · 시작 단어' : ''}</span>` : ''}</li>`).join('')}</ol>` : '—'}</dd>
         <dt>노출</dt><dd>${(st => st ? `<span class="mono">${st.total}</span>회 (서로 다른 사진 <span class="mono">${st.unique}</span>장, 화면에 보인 것 <span class="mono">${st.inView}</span>회) · 크게 보기 <span class="mono">${st.previews}</span>회 · 채운 검색 <span class="mono">${st.padded}</span>회` : '<span class="muted">— (이전 버전 기록)</span>')(impStats(r))}</dd>
-        <dt>마음에 든 사진</dt><dd class="mono">${r.liked.length}장</dd>
+        <dt>담은 사진</dt><dd class="mono">${r.liked.length}장</dd>
         <dt>최종 사진</dt><dd class="mono" style="word-break:break-all">${r.final ? esc(r.final.name) : '—'}</dd>
         <dt>버전</dt><dd class="mono small muted">${esc(r.appVersion || '이전 버전')} · 풀 ${esc(r.poolVer || '—')}${r.poolSize ? ` (${r.poolSize}장)` : ''}</dd></dl>
       <div class="g-strip">${r.liked.map(ref => thumbHTML(ref, r.final && ref.id === r.final.id)).join('') || '<p class="small muted">담은 사진 없음</p>'}</div>
@@ -1197,7 +1294,7 @@ function archiveCSV(recs = ARCH){
 }
 // 노출 한 건 = 한 줄 (검색 결과에 그린 사진 한 장, 또는 크게 보기 한 번). 이전 버전 기록은 줄이 없다
 const IMP_TARGETS = ['plant','rug','lamp','art','bedding'];
-const IMP_HEAD = ['researcher','participant_id','record_no','status','app_version','pool_ver','event_no','query_no','query','source','context','shown_at','photo_id','photo','rank','is_match','padded','hits','in_viewport','first_visible_at','tile_w','tile_h','viewport_w','viewport_h','preview_via','dwell_ms','contains',...IMP_TARGETS.map(t => 'has_' + t),'aspect_ratio','liked_at_end','is_final'];
+const IMP_HEAD = ['researcher','participant_id','record_no','status','app_version','pool_ver','event_no','query_no','query','source','context','shown_at','photo_id','photo','rank','is_match','padded','hits','in_viewport','first_visible_at','tile_w','tile_h','viewport_w','viewport_h','preview_via','dwell_ms','contains',...IMP_TARGETS.map(t => 'has_' + t),'aspect_ratio','liked_at_end','is_final','query_via'];
 // 기록 한 건의 노출 줄 (값 배열, IMP_HEAD 순서). impressions.csv와 시트의 "검색 노출" 탭이 같이 쓴다
 function impressionRows(r){
   if (!Array.isArray(r.shows)) return [];
@@ -1206,12 +1303,14 @@ function impressionRows(r){
   const ph = id => { const m = meta[id], p = photoById(id); return {name: (m && m.name) || (p && p.name) || id, contains: (m && m.contains) || (p && p.contains) || [], ar: (m && m.ar) || (p && p.ar) || ''}; };
   const tail = id => { const x = ph(id); return [x.contains.map(c => (TARGETS.find(t => t.id === c) || {name: c}).name).join(';'), ...IMP_TARGETS.map(t => x.contains.includes(t) ? 1 : 0), x.ar, liked.has(id) ? 1 : 0, id === fin ? 1 : 0]; };
   const base = [r.researcher || '', r.label, r.no, r.status, r.appVersion || '', r.poolVer || ''];
+  // 맨 끝 열 query_via (2026-10-27.5부터): 그 검색이 직접 입력(typed)인지 시작 단어(chip)인지. 예전 기록은 빈칸
+  const via = (qn, v) => v || (qn ? ((r.queries || [])[qn - 1] || {}).via : '') || '';
   r.shows.forEach(e => e.ids.forEach((id, k) => {
     const rank = e.from + k, v = e.vis ? e.vis[id] : null, sz = (e.sz || {})[id] || [];
     out.push([...base, e.n, e.qn, e.q, e.source, 'search', e.at, id, ph(id).name, rank, e.hits != null ? (rank <= e.hits ? 1 : 0) : '', e.padded ? 1 : 0, e.hits ?? '',
-      v != null ? 1 : 0, v != null ? new Date(Date.parse(e.at) + v).toISOString() : '', sz[0] ?? '', sz[1] ?? '', e.vw ?? '', e.vh ?? '', '', '', ...tail(id)]);
+      v != null ? 1 : 0, v != null ? new Date(Date.parse(e.at) + v).toISOString() : '', sz[0] ?? '', sz[1] ?? '', e.vw ?? '', e.vh ?? '', '', '', ...tail(id), via(e.qn, e.via)]);
   }));
-  (r.previews || []).forEach(e => out.push([...base, '', e.qn, e.q, 'preview', e.from, e.openedAt, e.id, ph(e.id).name, e.rank, '', '', '', '', '', e.w ?? '', e.h ?? '', e.vw ?? '', e.vh ?? '', e.via, e.dwellMs ?? '', ...tail(e.id)]));
+  (r.previews || []).forEach(e => out.push([...base, '', e.qn, e.q, 'preview', e.from, e.openedAt, e.id, ph(e.id).name, e.rank, '', '', '', '', '', e.w ?? '', e.h ?? '', e.vw ?? '', e.vh ?? '', e.via, e.dwellMs ?? '', ...tail(e.id), via(e.qn)]));
   return out;
 }
 function impressionsCSV(recs = ARCH){
@@ -1437,7 +1536,12 @@ window.addEventListener('storage', e => {
   if (e.key === PICK_KEY){
     reloadPick();
     if (RESEARCH_PAGE && S.mode !== 'search') renderTopRight(); // 진행 중 표시만 갱신 (노출 기록이 자주 바뀌어도 화면 전체를 다시 그리지 않게)
-    else if (SEARCH_PAGE && !P.pid){ S.nextUp = false; S.lastQuery = ''; render(); } // 연구자 창에서 "미완료로 끝내기"
+    else if (SEARCH_PAGE && !P.pid){ S.nextUp = false; S.lastQuery = ''; render(); } // 연구자 창에서 "미완료로 끝내기" (또는 검색 창 없이 "다음 참여자 받기")
+  }
+  // 연구자 창의 "다음 참여자 받기": 결정을 마친 같은 참여자일 때만 시작 화면으로
+  if (e.key === NEXT_KEY && SEARCH_PAGE && e.newValue){
+    reloadPick(); const n = LS.get(NEXT_KEY, {}) || {};
+    if (P.final && n.pid === P.pid && n.final === P.final) nextParticipant();
   }
   if (e.key === 'rs_pool_ping' && !S.syncing){
     clearTimeout(poolTimer);
@@ -1452,7 +1556,9 @@ function restoreResults(){ if (P.lastQ && !P.final && !S.lastQuery){ doSearch(P.
   await loadPhotos(); if (P.active) S.mode = 'search';
   if (S.photos.length) restoreResults();
   render();
-  if (await syncDefaultPool()){ restoreResults(); render(); }
+  const changed = await syncDefaultPool();
+  S.poolReady = true; // 시작 화면 입력을 연다
+  if (changed){ restoreResults(); render(); } else if ($('#start-form')) renderStartUI();
   ensureAspect();
   // 검색 전용 창이 아닌 창이 시트로 못 간 기록을 다시 보낸다 (시작 직후 한 번, 그 뒤 5초마다 기다림이 끝난 기록만)
   if (!SEARCH_PAGE){ setTimeout(sheetPump, 1500); setInterval(sheetPump, 5000); }
