@@ -61,7 +61,7 @@ body.search-mode .wrap{max-width:1680px}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .btn:disabled:hover{background:var(--sec)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-input[type=text],input[type=number],input[type=search],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:0 14px;min-height:40px;width:100%;color:var(--ink)}
+input[type=text],input[type=password],input[type=number],input[type=search],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:0 14px;min-height:40px;width:100%;color:var(--ink)}
 input:focus{border-color:var(--ash);outline:none}
 input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 select{min-height:32px;padding:0 8px 0 12px;font-size:13px;cursor:pointer}
@@ -251,6 +251,9 @@ body.has-finish #main{padding-bottom:80px}
 .pill{display:inline-flex;align-items:center;min-height:24px;padding:0 10px;border-radius:var(--pill);font-size:12px;font-weight:600;background:var(--card);color:var(--muted)}
 .pill.ok{background:var(--accent-soft);color:var(--ink)}
 .pill.warn{background:var(--research-soft);color:var(--research)}
+.pill.bad{background:var(--danger-soft);color:var(--danger)}
+#sheet-box summary{cursor:pointer;font-weight:600;font-size:14px} #sheet-box[open] summary{margin-bottom:12px}
+#sheet-box input{max-width:560px}
 .ph-missing{width:160px;aspect-ratio:3/2;border-radius:12px;background:var(--card);display:grid;place-items:center;font-size:12px;color:var(--muted)}
 .q-list{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:2px}
 .q-list li{line-height:1.5}
@@ -324,7 +327,7 @@ const SYN = {
 };
 const MAX_EDGE = 1600, THUMB_EDGE = 420;
 // 앱 버전: 기록마다 붙는다. 화면·기록 방식을 바꾸면 날짜와 순번을 올린다
-const APP_VERSION = '2026-10-27.3';
+const APP_VERSION = '2026-10-27.4';
 // 참여자 화면의 과제 안내 한 줄 (검색 그룹 진행 대본의 과제 문장 + 하트 안내)
 const TASK_LINE = '다음에 혼자 지낼 방으로 가장 마음에 드는 방을 정해 주세요. 마음에 드는 사진은 하트를 눌러 담아 주세요.';
 
@@ -1107,7 +1110,9 @@ function archiveCurrent(status){
     appVersion: APP_VERSION, poolVer: LS.get('rs_pool_ver', ''), poolSize: S.photos.length, sessionAt: P.sessionAt || null,
     shows: JSON.parse(JSON.stringify(P.shows || [])), previews: JSON.parse(JSON.stringify(P.previews || []))};
   rec.photoMeta = photoMetaFor(rec);
+  if (sheetCfg().url) rec.sheet = {state: 'pending', next: 0}; // 2026-10-27.4부터: 시트로 보낼 기록 (주소가 없으면 이 필드도 없음)
   ARCH.push(rec); saveArch(); P.archivedId = rec.id;
+  sheetKick(rec.id);
 }
 // 기록에 나온 모든 사진(노출·크게 보기·담기·최종)의 {name, contains[], ar}
 function photoMetaFor(r){
@@ -1142,14 +1147,15 @@ function renderArchive(){
   const done = list.filter(r => r.status === '완료').length;
   $('#body').innerHTML = `<div class="stack">
     <div class="row"><label class="small" for="who">진행자</label><input type="text" id="who" value="${esc(LS.get(WHO_KEY, ''))}" placeholder="예: 의현" autocomplete="off" style="width:160px"><span class="small muted">이 PC에서 진행하는 사람. 새 기록과 내보내기 파일 이름에 붙습니다</span></div>
+    ${sheetBoxHTML(list)}
     <div class="row between"><p class="small muted">최종 선택을 마치면 자동으로 기록됩니다. 최종 선택 전에 다음 참여자로 넘어가면 "미완료"로 남습니다. · 완료 <b class="mono">${done}</b> · 전체 <b class="mono">${list.length}</b></p>
       <div class="row">${whos.length > 1 ? `<select id="arch-who" style="width:auto" aria-label="진행자별 보기"><option value="">모든 진행자</option>${whos.map(w => `<option value="${esc(w)}" ${S.archWho === w ? 'selected' : ''}>${esc(w || '(이름 없음)')} · ${ARCH.filter(r => (r.researcher || '') === w).length}명</option>`).join('')}</select>` : ''}
         <label class="btn sm" for="arch-imp" style="cursor:pointer" title="각자 내보낸 ZIP을 올리면 기록을 합쳐서 보여 줍니다. 여러 개를 한 번에 고를 수 있어요">기록 불러오기 (ZIP)</label><input type="file" id="arch-imp" accept=".zip,.json" multiple hidden>
         <button class="btn sm" id="arch-zip" ${list.length ? '' : 'disabled'}>기록 + 최종 사진 (ZIP)</button></div></div>
     ${list.length ? list.map(r => `<div class="card stack arch" data-arch="${r.id}">
       <div class="row between">
-        <div class="row"><span class="mono small muted">#${r.no}</span><input type="text" class="arch-label" data-f="label" value="${esc(r.label)}" placeholder="참여자 ID" aria-label="참여자 ID (#${r.no})"><span class="pill ${r.status === '완료' ? 'ok' : 'warn'}">${r.status}</span>${r.imported ? '<span class="pill">불러온 기록</span>' : ''}</div>
-        <div class="row">${r.final && photoById(r.final.id) ? `<a class="btn sm" href="${urlFor(photoById(r.final.id),'full')}" download="P${r.no}_FINAL_${esc(r.final.name.replace(/\.[^.]+$/, ''))}.jpg">최종 사진 저장</a>` : ''}<button class="btn sm danger" data-del="${r.id}" type="button">기록 삭제</button></div>
+        <div class="row"><span class="mono small muted">#${r.no}</span><input type="text" class="arch-label" data-f="label" value="${esc(r.label)}" placeholder="참여자 ID" aria-label="참여자 ID (#${r.no})"><span class="pill ${r.status === '완료' ? 'ok' : 'warn'}">${r.status}</span>${r.imported ? '<span class="pill">불러온 기록</span>' : ''}${sheetBadge(r)}</div>
+        <div class="row">${r.final && photoById(r.final.id) ? `<a class="btn sm" href="${urlFor(photoById(r.final.id),'full')}" download="P${r.no}_FINAL_${esc(r.final.name.replace(/\.[^.]+$/, ''))}.jpg">최종 사진 저장</a>` : ''}${sheetCfg().url ? `<button class="btn sm" data-sheet="${r.id}" type="button" ${r.sheet && r.sheet.state === 'sending' && (r.sheet.until || 0) > Date.now() ? 'disabled' : ''}>${r.sheet ? '시트로 다시 보내기' : '시트로 보내기'}</button>` : ''}<button class="btn sm danger" data-del="${r.id}" type="button">기록 삭제</button></div>
       </div>
       <dl class="kv"><dt>진행자</dt><dd>${esc(r.researcher || '—')}</dd><dt>${r.status === '완료' ? '결정 시각' : '기록 시각'}</dt><dd class="mono">${fmtTime(r.finishedAt)} (첫 검색부터 ${durMin(r)})</dd>
         <dt>검색어 (${(r.queries || []).length}회)</dt><dd>${(r.queries || []).length ? `<ol class="q-list">${r.queries.map(x => `<li><span class="mono small muted">${new Date(x.at).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'})}</span> ${esc(x.q)}${x.hits != null ? ` <span class="small muted">· 일치 ${x.hits}장${x.padded ? ' · 나머지 사진으로 채움' : ''}</span>` : ''}</li>`).join('')}</ol>` : '—'}</dd>
@@ -1161,7 +1167,15 @@ function renderArchive(){
     </div>`).join('') : '<div class="empty card">아직 기록이 없습니다. 참여자가 최종 사진을 고르면 여기에 쌓입니다.</div>'}
   </div>`;
   $('#who').oninput = e => LS.set(WHO_KEY, e.target.value.trim());
-  $$('.arch-label').forEach(inp => inp.oninput = () => { reloadArch(); const r = ARCH.find(x => x.id === inp.closest('[data-arch]').dataset.arch); if (r){ r.label = inp.value; saveArch(); } });
+  // 참여자 ID를 고치면 이미 시트에 간 기록은 "대기"로 돌려 잠시 뒤 다시 보낸다 (시트에서 같은 기록 줄을 바꿔 씀)
+  $$('.arch-label').forEach(inp => { inp.oninput = () => { reloadArch(); const r = ARCH.find(x => x.id === inp.closest('[data-arch]').dataset.arch); if (r){ r.label = inp.value; if (r.sheet && !r.imported && sheetCfg().url) r.sheet = {state: 'pending', next: Date.now() + 4000, tries: 0}; saveArch(); } };
+    inp.onchange = () => setTimeout(rerenderResearcher, 0); });
+  bindSheetBox();
+  $$('[data-sheet]').forEach(b => b.onclick = async () => {
+    b.disabled = true; b.textContent = '보내는 중…';
+    const j = await sendRecord(b.dataset.sheet);
+    toast(!j ? '다른 창에서 보내는 중입니다' : j.ok ? '시트에 저장했습니다' : '시트 저장 실패 · ' + sheetErrText(j)); rerenderResearcher();
+  });
   $$('[data-del]').forEach(b => b.onclick = () => {
     if (!b.dataset.sure){ b.dataset.sure = 1; b.textContent = '한 번 더 누르면 삭제'; setTimeout(() => { if (b.isConnected){ delete b.dataset.sure; b.textContent = '기록 삭제'; } }, 4000); return; }
     reloadArch(); ARCH = ARCH.filter(r => r.id !== b.dataset.del); saveArch(); render();
@@ -1170,35 +1184,39 @@ function renderArchive(){
   $('#arch-imp').onchange = e => importArchive(e.target.files);
   const zp = $('#arch-zip'); if (zp) zp.onclick = exportArchiveZip;
 }
+// 최종 사진을 담은 검색 (번호:검색어)
+const finalQueryOf = r => { const f = r.final && r.liked.find(x => x.id === r.final.id); return f && f.qn ? `${f.qn}:${f.q}` : ''; };
 function archiveCSV(recs = ARCH){
   const cell = v => { const x = String(v ?? ''); return /[",\n]/.test(x) ? `"${x.replace(/"/g,'""')}"` : x; };
   const head = ['no','researcher','participant_id','status','started_at','finished_at','query_count','queries','liked_count','liked_with_query','unliked_count','final_query','liked_files','final_file','final_in_liked_order',
     'app_version','pool_ver','impressions_total','impressions_in_viewport','unique_photos_seen','unique_photos_in_viewport','previews_count','preview_dwell_ms_total','padded_queries'];
-  const rows = recs.map(r => [r.no, r.researcher || '', r.label, r.status, r.startedAt || '', r.finishedAt || '', (r.queries || []).length, (r.queries || []).map(x => x.q).join(' | '), r.liked.length, r.liked.map(x => `${x.name}@${x.qn ? x.qn + ':' + x.q : '-'}`).join(' | '), (r.likeLog || []).filter(e => e.action === '빼기').length, (() => { const f = r.final && r.liked.find(x => x.id === r.final.id); return f && f.qn ? `${f.qn}:${f.q}` : ''; })(), r.liked.map(x => x.name).join('|'), r.final ? r.final.name : '', r.final ? r.liked.findIndex(x => x.id === r.final.id) + 1 : '',
+  const rows = recs.map(r => [r.no, r.researcher || '', r.label, r.status, r.startedAt || '', r.finishedAt || '', (r.queries || []).length, (r.queries || []).map(x => x.q).join(' | '), r.liked.length, r.liked.map(x => `${x.name}@${x.qn ? x.qn + ':' + x.q : '-'}`).join(' | '), (r.likeLog || []).filter(e => e.action === '빼기').length, finalQueryOf(r), r.liked.map(x => x.name).join('|'), r.final ? r.final.name : '', r.final ? r.liked.findIndex(x => x.id === r.final.id) + 1 : '',
     // 아래는 2026-10-27.2부터. 이전 버전 기록은 빈칸
     ...(st => [r.appVersion || '', r.poolVer || '', ...(st ? [st.total, st.inView, st.unique, st.uniqView, st.previews, st.dwell, st.padded] : ['','','','','','',''])])(impStats(r))]);
   return [head.join(','), ...rows.map(r => r.map(cell).join(','))].join('\n');
 }
 // 노출 한 건 = 한 줄 (검색 결과에 그린 사진 한 장, 또는 크게 보기 한 번). 이전 버전 기록은 줄이 없다
 const IMP_TARGETS = ['plant','rug','lamp','art','bedding'];
+const IMP_HEAD = ['researcher','participant_id','record_no','status','app_version','pool_ver','event_no','query_no','query','source','context','shown_at','photo_id','photo','rank','is_match','padded','hits','in_viewport','first_visible_at','tile_w','tile_h','viewport_w','viewport_h','preview_via','dwell_ms','contains',...IMP_TARGETS.map(t => 'has_' + t),'aspect_ratio','liked_at_end','is_final'];
+// 기록 한 건의 노출 줄 (값 배열, IMP_HEAD 순서). impressions.csv와 시트의 "검색 노출" 탭이 같이 쓴다
+function impressionRows(r){
+  if (!Array.isArray(r.shows)) return [];
+  const out = [];
+  const meta = r.photoMeta || {}, liked = new Set((r.liked || []).map(x => x.id)), fin = r.final ? r.final.id : null;
+  const ph = id => { const m = meta[id], p = photoById(id); return {name: (m && m.name) || (p && p.name) || id, contains: (m && m.contains) || (p && p.contains) || [], ar: (m && m.ar) || (p && p.ar) || ''}; };
+  const tail = id => { const x = ph(id); return [x.contains.map(c => (TARGETS.find(t => t.id === c) || {name: c}).name).join(';'), ...IMP_TARGETS.map(t => x.contains.includes(t) ? 1 : 0), x.ar, liked.has(id) ? 1 : 0, id === fin ? 1 : 0]; };
+  const base = [r.researcher || '', r.label, r.no, r.status, r.appVersion || '', r.poolVer || ''];
+  r.shows.forEach(e => e.ids.forEach((id, k) => {
+    const rank = e.from + k, v = e.vis ? e.vis[id] : null, sz = (e.sz || {})[id] || [];
+    out.push([...base, e.n, e.qn, e.q, e.source, 'search', e.at, id, ph(id).name, rank, e.hits != null ? (rank <= e.hits ? 1 : 0) : '', e.padded ? 1 : 0, e.hits ?? '',
+      v != null ? 1 : 0, v != null ? new Date(Date.parse(e.at) + v).toISOString() : '', sz[0] ?? '', sz[1] ?? '', e.vw ?? '', e.vh ?? '', '', '', ...tail(id)]);
+  }));
+  (r.previews || []).forEach(e => out.push([...base, '', e.qn, e.q, 'preview', e.from, e.openedAt, e.id, ph(e.id).name, e.rank, '', '', '', '', '', e.w ?? '', e.h ?? '', e.vw ?? '', e.vh ?? '', e.via, e.dwellMs ?? '', ...tail(e.id)]));
+  return out;
+}
 function impressionsCSV(recs = ARCH){
   const cell = v => { const x = String(v ?? ''); return /[",\n]/.test(x) ? `"${x.replace(/"/g,'""')}"` : x; };
-  const head = ['researcher','participant_id','record_no','status','app_version','pool_ver','event_no','query_no','query','source','context','shown_at','photo_id','photo','rank','is_match','padded','hits','in_viewport','first_visible_at','tile_w','tile_h','viewport_w','viewport_h','preview_via','dwell_ms','contains',...IMP_TARGETS.map(t => 'has_' + t),'aspect_ratio','liked_at_end','is_final'];
-  const out = [head.join(',')];
-  for (const r of recs){
-    if (!Array.isArray(r.shows)) continue;
-    const meta = r.photoMeta || {}, liked = new Set((r.liked || []).map(x => x.id)), fin = r.final ? r.final.id : null;
-    const ph = id => { const m = meta[id], p = photoById(id); return {name: (m && m.name) || (p && p.name) || id, contains: (m && m.contains) || (p && p.contains) || [], ar: (m && m.ar) || (p && p.ar) || ''}; };
-    const tail = id => { const x = ph(id); return [x.contains.map(c => (TARGETS.find(t => t.id === c) || {name: c}).name).join(';'), ...IMP_TARGETS.map(t => x.contains.includes(t) ? 1 : 0), x.ar, liked.has(id) ? 1 : 0, id === fin ? 1 : 0]; };
-    const base = [r.researcher || '', r.label, r.no, r.status, r.appVersion || '', r.poolVer || ''];
-    r.shows.forEach(e => e.ids.forEach((id, k) => {
-      const rank = e.from + k, v = e.vis ? e.vis[id] : null, sz = (e.sz || {})[id] || [];
-      out.push([...base, e.n, e.qn, e.q, e.source, 'search', e.at, id, ph(id).name, rank, e.hits != null ? (rank <= e.hits ? 1 : 0) : '', e.padded ? 1 : 0, e.hits ?? '',
-        v != null ? 1 : 0, v != null ? new Date(Date.parse(e.at) + v).toISOString() : '', sz[0] ?? '', sz[1] ?? '', e.vw ?? '', e.vh ?? '', '', '', ...tail(id)].map(cell).join(','));
-    }));
-    (r.previews || []).forEach(e => out.push([...base, '', e.qn, e.q, 'preview', e.from, e.openedAt, e.id, ph(e.id).name, e.rank, '', '', '', '', '', e.w ?? '', e.h ?? '', e.vw ?? '', e.vh ?? '', e.via, e.dwellMs ?? '', ...tail(e.id)].map(cell).join(',')));
-  }
-  return out.join('\n');
+  return [IMP_HEAD.join(','), ...recs.flatMap(r => impressionRows(r).map(x => x.map(cell).join(',')))].join('\n');
 }
 async function exportArchiveZip(){
   if (typeof JSZip === 'undefined'){ toast('ZIP을 만들려면 인터넷 연결이 필요합니다. CSV로 받아 주세요'); return; }
@@ -1247,6 +1265,148 @@ async function importArchive(fileList){
   toast(`기록 ${added}건 추가${dup ? ` · 이미 있는 ${dup}건 건너뜀` : ''}${bad ? ` · 읽지 못한 파일 ${bad}개 (기록 ZIP이 맞는지 확인해 주세요)` : ''}`);
 }
 
+/* ---------- 구글 시트로 한 벌 더 보내기 (2026-10-27.4, 선택) ---------- */
+// 연구자 화면 "시트 연결"에 Apps Script 웹 앱 주소·토큰을 넣으면, 기록이 생길 때(완료·미완료) 시트에도 보낸다.
+// 주소가 없으면 아무것도 하지 않는다 (예전처럼 이 브라우저 + ZIP만). 주소·토큰은 이 브라우저(rs_sheet)에만 두고 코드에는 넣지 않는다.
+// 줄은 여기서 만든다 (impressions.csv와 같은 impressionRows·impStats를 써서 시트와 CSV가 같게). 시트 쪽은 열 이름으로 칸을 찾는다.
+// 누가 보내나: 기록을 만든 창이 바로 한 번 보내고, 검색 전용 창(?view=search)이 아닌 창이 대기·실패 기록을 다시 보낸다(sheetPump).
+// 겹쳐 보내지 않게: 보내기 전에 기록에 {state:'sending', by: 이 창(TAB_ID), until}을 적고 잠깐 뒤 다시 읽어 내 표시가 남아 있을 때만 보낸다.
+// 시트도 같은 record_id 줄을 지우고 다시 쓰므로, 혹시 두 번 가도 줄은 한 벌만 남는다.
+// 참여자 화면에는 아무것도 보이지 않고, 실패해도 참여자 진행에는 영향이 없다.
+const SHEET_KEY = 'rs_sheet';
+const sheetCfg = () => { const c = LS.get(SHEET_KEY, {}) || {}; return {url: String(c.url || '').trim(), token: String(c.token || '').trim()}; };
+const SHEET_BACKOFF = [15, 30, 60, 120, 300]; // 실패 뒤 다시 보내기까지 기다리는 초 (마지막 값이 최대)
+const SHEET_CLAIM_MS = 45000, SHEET_TIMEOUT_MS = 30000;
+const sheetInFlight = new Set();
+const SHEET_ERR = {network: '연결 안 됨', timeout: '응답 없음', bad_token: '토큰이 맞지 않음', token_not_set: '시트에 토큰이 없음', no_tab: '시트에 탭이 없음', no_record_id_column: '시트 머리글 확인',
+  bad_reply: '응답이 이상함 (배포 설정 확인)', busy: '시트가 바쁨', bad_json: '보낸 내용 오류', server_error: '시트 오류', no_url: '주소 없음'};
+const sheetErrText = j => (SHEET_ERR[j.error] || (/^http_/.test(j.error || '') ? `HTTP ${j.error.slice(5)}` : (j.error || '알 수 없음'))) + (j.detail ? ` (${String(j.detail).slice(0, 60)})` : '');
+// 기록 한 건 → 시트 세 탭의 줄. {탭: {columns, values}} (record_id, received_at은 시트가 채운다)
+function sheetRows(r){
+  const st = impStats(r), fin = r.final, liked = r.liked || [];
+  const fm = fin ? ((r.photoMeta || {})[fin.id] || null) : null, fp = fin ? photoById(fin.id) : null;
+  const finC = fin ? ((fm && fm.contains) || (fp && fp.contains) || []) : null;
+  const mins = r.startedAt && r.finishedAt ? Math.round((Date.parse(r.finishedAt) - Date.parse(r.startedAt)) / 6000) / 10 : '';
+  const g = {researcher: r.researcher || '', participant_id: r.label || '', status: r.status || '', session_at: r.sessionAt || '', started_at: r.startedAt || '', finished_at: r.finishedAt || '',
+    minutes: Number.isFinite(mins) ? mins : '', query_count: (r.queries || []).length, queries: (r.queries || []).map(x => x.q).join(' | '),
+    liked_count: liked.length, unliked_count: (r.likeLog || []).filter(e => e.action === '빼기').length, liked_files: liked.map(x => x.name).join('|'),
+    final_file: fin ? fin.name : '', final_query: finalQueryOf(r)};
+  IMP_TARGETS.forEach(t => { g['final_has_' + t] = finC ? (finC.includes(t) ? 1 : 0) : ''; });
+  Object.assign(g, st ? {impressions_total: st.total, impressions_in_viewport: st.inView, unique_photos_seen: st.unique, unique_photos_in_viewport: st.uniqView, previews_count: st.previews, padded_queries: st.padded}
+    : {impressions_total: '', impressions_in_viewport: '', unique_photos_seen: '', unique_photos_in_viewport: '', previews_count: '', padded_queries: ''});
+  Object.assign(g, {app_version: r.appVersion || '', pool_ver: r.poolVer || ''});
+  const likes = (r.likeLog || []).map((e, i) => [r.researcher || '', r.label || '', i + 1, e.action || '', e.name || refOf(e.id).name, e.qn ?? '', e.q ?? '', e.where || '', e.at || '']);
+  return {
+    '기록': {columns: Object.keys(g), values: [Object.values(g)]},
+    '노출': {columns: IMP_HEAD, values: impressionRows(r)},
+    '담기': {columns: ['researcher','participant_id','event_no','action','photo','query_no','query','where','at'], values: likes}
+  };
+}
+// 본문은 글자(text/plain)로, 머리글을 따로 붙이지 않는다 → 브라우저가 사전 확인(preflight) 없이 보낸다. Apps Script의 302 이동은 fetch가 따라간다
+async function sheetFetch(url, init = {}){
+  const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ac ? setTimeout(() => ac.abort(), SHEET_TIMEOUT_MS) : null;
+  try{
+    const res = await fetch(url, Object.assign({redirect: 'follow', cache: 'no-store', credentials: 'omit'}, init, ac ? {signal: ac.signal} : {}));
+    const txt = await res.text(); let j = null; try{ j = JSON.parse(txt); }catch(e){}
+    if (!j || typeof j !== 'object') return {ok: false, error: res.ok ? 'bad_reply' : 'http_' + res.status};
+    return j;
+  }catch(e){ return {ok: false, error: e && e.name === 'AbortError' ? 'timeout' : 'network'}; }
+  finally{ if (timer) clearTimeout(timer); }
+}
+const sheetPost = (cfg, body) => sheetFetch(cfg.url, {method: 'POST', body: JSON.stringify(Object.assign({token: cfg.token}, body))});
+function setSheet(id, val){ reloadArch(); const r = ARCH.find(x => x.id === id); if (!r) return; r.sheet = val; saveArch(); sheetUI(); }
+// 이 창이 기록 탭을 보여 주고 있으면 다시 그린다
+function sheetUI(){ if (S.mode !== 'search' && (S.rtab || 'pool') === 'archive' && $('#body')) rerenderResearcher(); }
+async function sendRecord(id){
+  const cfg = sheetCfg();
+  if (!cfg.url || sheetInFlight.has(id)) return null;
+  reloadArch(); let r = ARCH.find(x => x.id === id); if (!r) return null;
+  const s = r.sheet || {}, tries = s.tries || 0;
+  if (s.state === 'sending' && s.by !== TAB_ID && (s.until || 0) > Date.now()) return null; // 다른 창이 보내는 중
+  sheetInFlight.add(id);
+  try{
+    setSheet(id, {state: 'sending', by: TAB_ID, until: Date.now() + SHEET_CLAIM_MS, tries, at: s.at || null});
+    await pause(200); // 같은 기록을 다른 창도 집었으면 나중에 적은 쪽만 남는다 (사진 풀 잠금과 같은 방식)
+    reloadArch(); r = ARCH.find(x => x.id === id);
+    if (!r || !r.sheet || r.sheet.by !== TAB_ID || r.sheet.state !== 'sending') return null; // 다른 창이 가져감
+    const reply = await sheetPost(cfg, {action: 'record', record_id: r.id, app_version: APP_VERSION, rows: sheetRows(r)});
+    reloadArch(); const cur = ARCH.find(x => x.id === id);
+    if (!cur || !cur.sheet || cur.sheet.by !== TAB_ID || cur.sheet.state !== 'sending') return reply; // 보내는 사이 고쳐짐 → 대기로 남아 다시 보낸다
+    if (reply.ok) setSheet(id, {state: 'sent', at: nowIso(), rows: reply.rows || null});
+    else { const n = tries + 1; setSheet(id, {state: 'failed', at: nowIso(), error: sheetErrText(reply), code: reply.error || '', tries: n, next: Date.now() + SHEET_BACKOFF[Math.min(n, SHEET_BACKOFF.length) - 1] * 1000}); }
+    return reply;
+  }catch(e){
+    try{ setSheet(id, {state: 'failed', at: nowIso(), error: '보내기 오류', code: 'client', tries: tries + 1, next: Date.now() + SHEET_BACKOFF[0] * 1000}); }catch(_){}
+    return {ok: false, error: 'client'};
+  }finally{ sheetInFlight.delete(id); }
+}
+// 기록을 만든 직후 한 번 보낸다 (실패해도 조용히 남겨 두고 연구자 화면이 다시 보낸다)
+function sheetKick(id){ try{ if (sheetCfg().url) setTimeout(() => { sendRecord(id).catch(() => {}); }, 50); }catch(e){} }
+const sheetDue = (r, now) => { const s = r.sheet; if (!s || r.imported || s.state === 'sent') return false; if (s.state === 'sending') return (s.until || 0) <= now; return (s.next || 0) <= now; };
+let sheetPumping = false;
+async function sheetPump(){
+  if (sheetPumping || !sheetCfg().url) return;
+  sheetPumping = true;
+  try{
+    reloadArch(); const now = Date.now();
+    for (const id of ARCH.filter(r => sheetDue(r, now)).map(r => r.id)) await sendRecord(id);
+  }catch(e){}
+  finally{ sheetPumping = false; }
+}
+// 손으로 다시 보내기: 기다림 없이 바로
+async function sheetSendNow(ids){
+  let ok = 0, bad = 0;
+  for (const id of ids){ const j = await sendRecord(id); if (j && j.ok) ok++; else if (j) bad++; }
+  return {ok, bad};
+}
+// 연결 확인: 주소(GET)와 토큰(POST ping)을 차례로 본다
+async function sheetCheck(){
+  const cfg = sheetCfg();
+  if (!/^https?:\/\//i.test(cfg.url)) return {ok: false, msg: '웹 앱 주소를 넣어 주세요 (https://script.google.com/macros/s/…/exec)'};
+  const g = await sheetFetch(cfg.url);
+  if (!g.ok || g.app !== 'search-to-sheet') return {ok: false, msg: '주소 확인 실패 · ' + (g.ok ? '다른 웹 앱의 주소입니다' : sheetErrText(g))};
+  if (!cfg.token) return {ok: false, msg: '주소는 맞습니다 · 토큰을 넣어 주세요'};
+  const p = await sheetPost(cfg, {action: 'ping'});
+  return p.ok ? {ok: true, msg: '연결됨 · 토큰 맞음'} : {ok: false, msg: '주소는 맞습니다 · ' + sheetErrText(p)};
+}
+function sheetBadge(r){
+  const s = r.sheet, on = !!sheetCfg().url;
+  if (!s) return on ? '<span class="pill" title="시트에 보내지 않은 기록">시트 안 보냄</span>' : '';
+  const t = s.at ? ` title="${esc(fmtTime(s.at))}"` : '';
+  if (s.state === 'sent') return `<span class="pill ok"${t}>시트 저장됨</span>`;
+  if (s.state === 'failed') return `<span class="pill bad"${t}>시트 실패 · ${esc(s.error || '')}</span>`;
+  if (s.state === 'sending' && (s.until || 0) > Date.now()) return '<span class="pill">시트 보내는 중</span>';
+  return '<span class="pill warn">시트 대기</span>';
+}
+function sheetBoxHTML(list){
+  const c = sheetCfg(), mine = list.filter(r => !r.imported);
+  const n = st => mine.filter(r => r.sheet && r.sheet.state === st).length;
+  const unsent = mine.filter(r => !r.sheet || r.sheet.state !== 'sent').length;
+  const sum = c.url ? `시트 연결 · 저장됨 <b class="mono">${n('sent')}</b> · 안 보냄·대기·실패 <b class="mono">${unsent}</b>` : '시트 연결 (선택) · 연결 안 함';
+  return `<details class="card" id="sheet-box" ${S.sheetOpen ? 'open' : ''}><summary>${sum}</summary><div class="stack" style="gap:10px">
+    <p class="small muted">구글 시트 Apps Script 웹 앱 주소와 토큰을 넣으면 기록이 생길 때마다 시트에도 한 벌 더 보냅니다. 주소와 토큰은 이 브라우저에만 저장됩니다. 기록 ZIP은 계속 받아 두세요.</p>
+    <label class="small" for="sheet-url">웹 앱 주소</label><input type="text" id="sheet-url" value="${esc(c.url)}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false">
+    <label class="small" for="sheet-token">토큰</label><input type="password" id="sheet-token" value="${esc(c.token)}" autocomplete="off" spellcheck="false">
+    <div class="row"><button class="btn sm" id="sheet-check" type="button">연결 확인</button>${c.url ? `<button class="btn sm" id="sheet-all" type="button" ${unsent ? '' : 'disabled'}>시트로 다시 보내기 (모두 ${unsent})</button>` : ''}<span class="small" id="sheet-msg" role="status">${esc(S.sheetMsg || '')}</span></div>
+  </div></details>`;
+}
+function bindSheetBox(){
+  const box = $('#sheet-box'); if (!box) return;
+  box.ontoggle = () => { S.sheetOpen = box.open; };
+  const save = () => { LS.set(SHEET_KEY, {url: $('#sheet-url').value.trim(), token: $('#sheet-token').value.trim()}); };
+  $('#sheet-url').oninput = save; $('#sheet-token').oninput = save;
+  // 주소·토큰을 바꾸면 실패한 기록을 바로 다시 보낼 수 있게 기다림을 없앤다
+  const changed = () => { save(); reloadArch(); let k = 0; ARCH.forEach(r => { if (r.sheet && r.sheet.state === 'failed'){ r.sheet.next = 0; k++; } }); if (k) saveArch(); S.sheetMsg = ''; sheetPump(); }; // 여기서 다시 그리지 않는다 (옆 칸으로 옮겨 가는 중에 입력이 끊기지 않게)
+  $('#sheet-url').onchange = changed; $('#sheet-token').onchange = changed;
+  $('#sheet-check').onclick = async () => { save(); const m = $('#sheet-msg'); m.textContent = '확인 중…'; const r = await sheetCheck(); S.sheetMsg = r.msg; const mm = $('#sheet-msg'); if (mm){ mm.textContent = r.msg; mm.style.color = r.ok ? '' : 'var(--danger)'; } };
+  const all = $('#sheet-all'); if (all) all.onclick = async () => {
+    all.disabled = true; all.textContent = '보내는 중…';
+    reloadArch(); const ids = archShown().filter(r => !r.imported && (!r.sheet || r.sheet.state !== 'sent')).map(r => r.id);
+    const res = await sheetSendNow(ids); toast(`시트로 보냄 ${res.ok}건${res.bad ? ` · 실패 ${res.bad}건` : ''}`); rerenderResearcher();
+  };
+}
+
 /* ---------- 연구자 패널 (검색 화면에서 나가기) ---------- */
 function renderRx(){
   const p = $('#rx-panel'); if (p.hidden) return;
@@ -1264,7 +1424,7 @@ let poolTimer = null;
 // 연구자 화면을 새로 그린다. 기록의 참여자 ID나 태그를 고치는 중이면 건너뛰고, 진행자 칸에 있던 커서는 되돌린다
 function rerenderResearcher(){
   const a = document.activeElement;
-  if (a && a.matches('.arch-label, #editor input')) return;
+  if (a && a.matches('.arch-label, #editor input, #sheet-box input')) return;
   const refocus = a && a.id === 'who';
   render();
   const w = refocus && $('#who'); if (w){ w.focus(); w.setSelectionRange(w.value.length, w.value.length); }
@@ -1294,5 +1454,7 @@ function restoreResults(){ if (P.lastQ && !P.final && !S.lastQuery){ doSearch(P.
   render();
   if (await syncDefaultPool()){ restoreResults(); render(); }
   ensureAspect();
+  // 검색 전용 창이 아닌 창이 시트로 못 간 기록을 다시 보낸다 (시작 직후 한 번, 그 뒤 5초마다 기다림이 끝난 기록만)
+  if (!SEARCH_PAGE){ setTimeout(sheetPump, 1500); setInterval(sheetPump, 5000); }
 })();
 </script>

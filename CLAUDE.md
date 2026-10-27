@@ -51,11 +51,12 @@
 | localStorage | `rs_archive` | 참여자 기록 배열 `ARCH`. 고치기 전에 `reloadArch()`로 다른 창의 최신 기록부터 읽는다 |
 | localStorage | `rs_researcher` | 이 PC의 진행자 이름. 새 기록의 `researcher`, CSV 열, 내보내기 파일 이름에 붙는다 |
 | localStorage | `rs_pool_ping` | IndexedDB를 고칠 때마다 바꾸는 신호. 다른 창이 받아 사진 풀을 다시 읽는다 |
+| localStorage | `rs_sheet` | 구글 시트 연결 `{url, token}` (2026-10-27.4부터, 선택). 이 브라우저에만 저장하고 **코드·저장소에는 절대 넣지 않는다**(공개 저장소). 없으면 시트 기능은 아무것도 하지 않는다 |
 | localStorage | `rs_settings`, `rs_sessions` | 예전 버전의 흔적. 지금 화면에서는 쓰지 않는다 |
 
 `contains`는 사진에 보이는 타깃 요소(식물·러그·스탠드 조명·벽 그림·겹친 침구·담요)를 **보이면 다** 적은 표시로, 나중에 요소 포함 비율을 맞추는 데 쓴다. 타깃 요소는 태그(`식물·러그·액자·스탠드·담요`)로도 달려 검색되고, room-pool 스킬의 `build_pool.py`가 이 태그에서 `contains`를 자동으로 채운다. 검색에서 빼지는 않는다(`isExcluded = () => false`). 2026-10-27에 다섯째 요소를 `따뜻한 조명`에서 `겹친 침구·담요`로 바꿨다: `따뜻한조명` 태그는 일반 조명 태그로 남아 있고, `담요`는 침대 이불 위에 담요·스로우·베드러너(호텔식 보조 이불)를 한 겹 더 얹거나 접어 둔 사진에만 단다(소파에 걸친 담요, 쿠션만 있는 것은 제외). `TARGETS`의 `warm` 항목은 예전 contains가 남은 사진 때문에 지우지 않았다.
 
-앱 버전 `APP_VERSION`(날짜 + 순번, 지금 `2026-10-27.3` = 디자인 정리·masonry)을 기록마다 붙인다. 화면이나 기록 방식을 바꾸면 올린다.
+앱 버전 `APP_VERSION`(날짜 + 순번, 지금 `2026-10-27.4` = 구글 시트 연결)을 기록마다 붙인다. 화면이나 기록 방식을 바꾸면 올린다.
 
 ### 노출 기록 (2026-10-27.2부터)
 
@@ -87,6 +88,7 @@
 
 - `queries[]`에는 2026-10-27.2부터 `hits`(맞은 사진 수), `padded`(나머지로 채웠는지)도 붙는다.
 - `appVersion`부터 아래 필드는 새 기록에만 있다. 예전 기록(필드 없음)도 그대로 불러오고 화면·CSV에서는 빈칸/"이전 버전 기록"으로 나온다. 고칠 때 이 호환을 깨지 않는다.
+- `sheet`(2026-10-27.4부터, 선택): 시트 보내기 상태 `{state: 'pending'|'sending'|'sent'|'failed', at, error, code, tries, next, by, until, rows}`. 기록을 만들 때 시트 주소가 있을 때만 붙는다. 없는 기록(예전 기록, 주소 없이 만든 기록)은 자동으로 보내지 않고 손으로 보낼 때만 간다.
 - `photoMeta`는 기록에 나온 모든 사진(노출·크게 보기·담기·최종)의 이름·타깃 요소·비율을 기록 순간 그대로 적어 둔 것(`photoMetaFor`). 풀이 나중에 바뀌어도 노출 분석이 된다.
 
 - 최종 결정 순간 `archiveCurrent('완료')`로 자동 저장된다.
@@ -102,6 +104,20 @@
 
 `impressions.csv`(`impressionsCSV`, 기록 ZIP 안): 노출 한 건 = 한 줄. 검색 결과에 그린 사진 한 장(`source` = search·more·return·reload·rerender, `context` = search) 또는 크게 보기 한 번(`source` = preview, `context` = search·saved). 열: `researcher, participant_id, record_no, status, app_version, pool_ver, event_no, query_no, query, source, context, shown_at, photo_id, photo, rank, is_match, padded, hits, in_viewport, first_visible_at, tile_w, tile_h, viewport_w, viewport_h, preview_via, dwell_ms, contains, has_plant, has_rug, has_lamp, has_art, has_bedding, aspect_ratio, liked_at_end, is_final`. `contains`는 타깃 요소 이름을 `;`로 이은 것(`photoMeta` 우선, 없으면 지금 풀). 예전 기록은 줄이 없다.
 
+## 구글 시트 연결 (2026-10-27.4, 선택)
+
+기록을 브라우저 + ZIP에 더해 구글 시트(운영 시트 사본의 `검색 기록`·`검색 노출`·`검색 담기` 탭)에도 한 벌 보낸다. Apps Script 코드와 설치 안내는 저장소 **밖** `1027_prep/sheet_connector/`(`search_to_sheet.gs`, `설치_안내.md`)에 있다(웹 앱 주소·토큰이 공개 저장소에 들어가지 않게).
+
+- 설정: 연구자 화면 `참여자 기록` 탭의 `시트 연결`(`sheetBoxHTML`/`bindSheetBox`) — 웹 앱 주소, 토큰, `연결 확인`(`sheetCheck`: GET으로 `{ok, app:'search-to-sheet'}` 확인 → POST `{action:'ping', token}`으로 토큰 확인). `rs_sheet`에 저장.
+- 줄은 **도구가 만든다**(`sheetRows`): `{기록|노출|담기: {columns, values}}`. 노출은 `impressionRows`(= `impressions.csv`와 같은 함수, `IMP_HEAD` 순서), 기록 요약은 `impStats`·`finalQueryOf`(= `participants.csv`와 같은 계산), 담기는 `likeLog` 한 건 = 한 줄. 시트는 1행 머리글을 **열 이름으로** 찾아 넣고 `received_at`·`record_id`는 시트가 채운다. 열을 더하면 `sheetRows`와 시트 머리글 둘 다에 같은 이름으로 넣는다(시트에 없는 이름은 건너뛰고 응답의 `unknown_columns`에 나온다).
+- 보내기(`sendRecord`): 본문은 문자열(text/plain), 머리글 없음 → CORS 사전 확인 없음. Apps Script의 302 이동을 fetch가 따라가 JSON을 읽는다. 30초 시간 제한.
+- 누가 보내나: 기록을 만든 창이 `archiveCurrent` 끝에서 `sheetKick`으로 바로 한 번 보낸다(검색 창이든 연구자 창이든). `?view=search`가 아닌 창은 `sheetPump`로 시작 1.5초 뒤·5초마다 `sheetDue`인 기록(대기, 기다림이 끝난 실패, 주인이 사라진 `sending`)을 다시 보낸다. 실패 뒤 기다림 `SHEET_BACKOFF` 15·30·60·120·300초. 불러온 기록(`imported`)은 자동으로 보내지 않는다.
+- 겹쳐 보내기 막기: 보내기 전에 기록에 `{state:'sending', by: TAB_ID, until: +45초}`를 적고 200ms 뒤 다시 읽어 내 표시가 남아 있을 때만 보낸다(사진 풀 잠금과 같은 방식). 보내는 사이 기록이 고쳐지면(참여자 ID 수정 → `pending`) `sent`로 덮지 않고 다시 보낸다. 시트도 같은 `record_id` 줄을 세 탭에서 지우고 다시 붙이므로(LockService) 혹시 두 번 가도 한 벌만 남는다.
+- 참여자 ID를 고치면 이미 보낸 기록은 4초 뒤 다시 보낸다. 주소·토큰을 바꾸면 실패한 기록의 기다림을 없앤다.
+- 화면: 카드 배지 `시트 저장됨`/`시트 대기`/`시트 보내는 중`/`시트 실패 · 이유`/`시트 안 보냄`(주소가 있을 때만), 카드별 `시트로 (다시) 보내기`, 위의 `시트로 다시 보내기 (모두 N)`(보이는 기록 중 불러온 것 빼고 아직 안 간 것). 참여자 화면에는 아무것도 없다. 실패해도 참여자 진행에 영향이 없다.
+- 시트 쪽 글자 보존: 글자가 있는 열은 붙이기 전에 `@`(일반 텍스트) 형식으로 바꾸고, `=`로 시작하는 글자는 앞에 `'`를 붙인다(`-러그`, `0123` 같은 검색어가 수식·숫자가 되지 않게). 숫자는 숫자로 들어간다.
+- 시험: Apps Script는 여기서 배포할 수 없으므로 `.gs`를 가짜 SpreadsheetApp 위에서 Node로 단위 시험하고, 같은 가짜를 쓰는 흉내 웹 앱(302 → JSON, `Access-Control-Allow-Origin: *`)에 실제 도구를 Playwright로 붙여 확인했다.
+
 ## 검색 동작
 
 - `runSearch(q, seed)`: 검색어를 토큰으로 나누고(조사 떼기, `-단어`·"○○ 없는/빼고"는 제외어), 사진 태그와 영어 동의어 사전 `SYN`에 맞는 개수로 점수를 매긴다. 동점은 시드 해시로 섞는다. 일치가 12장 미만이면 나머지 사진으로 24장까지 채운다. 태그가 검색어를 품으면 1점, 검색어가 태그를 품기만 하면 0.5점(턴테이블 → 테이블)이다. 한 글자 검색어(책·꽃·옷 등)는 태그·동의어와 똑같을 때만 걸린다. `ROOM_WORDS`(방·침실·원룸·자취방·침대·벽·천장·공간·인테리어·사진 등)는 점수에서 빼고, `N평`은 10평 이하면 `좁은`으로 읽고, 끝의 `톤·색·처럼·랑·만·하게` 등은 떼어 읽는다(베이지톤 → 베이지, 소파랑 → 소파).
@@ -113,6 +129,7 @@
 - 연구자(진행 표시): `renderTopRight`, `updateLive`(1초마다), 기록 요약 `impStats`, 노출 CSV `impressionsCSV`
 - 참여자: `renderSearchUI`, `doSearch`, `drawResults(source, before)`, `layoutMasonry`/`masonry`(칸 배치, `arOf`·`masonryCols`), `sizePreview`, `toggleLike`(likeLog 기록), `syncLikes`/`syncFinishBar`(아래 고정 줄), `renderSavedUI`, `confirmFinal`, `renderDoneUI`, `openPreview(id, list, fromSaved, via)`, `restoreResults`
 - 노출 기록: `logShow`, `observeTiles`(IntersectionObserver), `measureTiles`, `pvOpen`/`pvClose`
+- 시트: `sheetCfg`, `sheetRows`, `sendRecord`, `sheetKick`, `sheetPump`, `sheetCheck`, `sheetBadge`, `sheetBoxHTML`/`bindSheetBox`, 노출 줄 `impressionRows`
 - 공통: `archiveCurrent`, `photoMetaFor`, `resetSession`, `savePick`/`savePickSoon`(400ms 모아 저장), `saveArch`, `urlFor`(blob URL 캐시), `ensureAspect`
 
 ## 작업 방식
@@ -127,4 +144,4 @@
 - [ ] **사진별 CSV** (제안만 함, 사용자 답 대기): 담은 사진 한 장 = 한 줄. 열 `participant_id, photo, query_no, query, liked_at, where, is_final`. 참여자 기록 탭에 내보내기 버튼으로 추가. (노출 한 건 = 한 줄인 `impressions.csv`는 기록 ZIP 안에 생겼다. 담기 기록은 아직 `participants.json`의 `likeLog`에만 있다)
 - [x] 결과 배치를 원래 비율을 유지하는 masonry로 바꿈(2026-10-27.3). `drawResults`의 `logShow`·`observeTiles`·`measureTiles` 호출은 그대로이고, 배치가 바뀔 때마다 `measureTiles`를 다시 부른다.
 - [ ] 진행 대본(1026)은 "최소 4장", "연구자에게 알려 주세요."를 누른다고 되어 있다. 도구는 장수 제한이 없고 버튼 이름이 `다음 참여자`로 바뀌었으니 대본을 맞춰야 한다.
-- 기록은 브라우저 localStorage에만 있으므로 세션마다 기록 ZIP으로 백업하도록 안내되어 있다. 연구자 3명이 각자 PC에서 진행하고(참여자 P01~P12를 미리 나눠 배정), 나중에 의현이 각자의 ZIP을 `기록 불러오기`로 한 화면에 합친다. 새 기록 번호(`no`)는 같은 진행자의 자기 기록만 보고 매긴다(불러온 기록 제외).
+- 시트 연결을 켜도 기록 원본은 브라우저 localStorage이고, 시트는 추가 사본이다. 그래서 여전히 세션마다 기록 ZIP으로 백업하도록 안내되어 있다. 연구자 3명이 각자 PC에서 진행하고(참여자 P01~P12를 미리 나눠 배정), 나중에 의현이 각자의 ZIP을 `기록 불러오기`로 한 화면에 합친다. 새 기록 번호(`no`)는 같은 진행자의 자기 기록만 보고 매긴다(불러온 기록 제외).
