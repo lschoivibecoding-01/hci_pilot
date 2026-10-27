@@ -7,7 +7,14 @@
 - `search_system.html` 하나. 빌드 없음.
 - `pool/pool.csv` + `pool/photos/*.jpg`: 기본 사진 풀(200장). http(s)로 열면(GitHub Pages 등) 페이지가 시작할 때 `syncDefaultPool()`로 이 브라우저의 IndexedDB에 맞춰 넣는다. 파일로 열면(file://) 브라우저가 막아서 건너뛰고, 그때는 `풀 불러오기`(ZIP)로 넣는다. 로컬 확인은 `python -m http.server`로 띄워서 한다.
 - 맨 위에 반드시 `<!doctype html>`, `<html lang="ko">`, `<meta charset="utf-8">`가 있어야 한다(없으면 로컬에서 열 때 한글이 깨진다).
-- 외부 의존성은 JSZip(cdnjs, ZIP 내보내기·불러오기)과 Google Fonts(IBM Plex Sans KR / Mono)뿐이다. 둘 다 없어도 핵심 기능은 동작한다.
+- 외부 의존성은 JSZip(cdnjs, ZIP 내보내기·불러오기)과 글꼴 Pretendard(jsDelivr, `pretendardvariable-dynamic-subset`)뿐이다. 둘 다 없어도 핵심 기능은 동작한다(글꼴은 Apple SD Gothic Neo / Malgun Gothic으로 대체). 숫자는 고정폭 글꼴 대신 본문 글꼴의 `tabular-nums`(`--f-mono`가 본문 글꼴을 가리킴).
+
+## 디자인 (2026-10-27.3)
+
+- 사진 검색 서비스 느낌의 차분한 화면. 특정 서비스의 로고·이름·빨간색은 쓰지 않는다(참여자가 실제 서비스로 착각하지 않게).
+- 토큰은 `:root` CSS 변수: 바탕 `--bg #fff`, 회색 면 `--card #f6f6f3`, 버튼 면 `--sec #e5e5e0`(누름 `--sec-press`), 선 `--line #dadad3`, 흐린 글자 `--muted #62625b`, 본문 `--body #33332e`, 강조 `--accent #262622`(먹색, 누름 `--accent-press` 더 짙게). 다크 모드는 `prefers-color-scheme` + `data-theme`로 같은 변수를 바꾼다(강조색이 밝은 색으로 뒤집힘).
+- 모서리는 16px(`--r`) / 32px(`--r-lg`, 모달·시작 카드) / 알약형(`--pill`)만. 그림자는 없다(모달 뒤 어두운 막 `--scrim`만).
+- 연구자 화면은 같은 토큰을 쓰고 호박색 띠(`--research`)로 참여자 화면과 구분한다.
 
 ## 화면 구성
 
@@ -24,10 +31,12 @@
    - 탭 `참여자 기록`: 참여자별 카드(ID 수정 가능, 완료/미완료, 검색어 목록(맞은 사진 수·채움 여부), 노출 요약, 앱·풀 버전, 담은 사진과 각각을 담은 검색, 최종 사진, 다른 PC에서 불러온 기록은 "불러온 기록" 표시), 진행자가 둘 이상이면 진행자별 보기(`S.archWho`), `기록 불러오기 (ZIP)`(`importArchive`: ZIP 안 `participants.json`을 읽어 `id`+`researcher`가 같은 기록은 건너뛰고 `imported: true`로 합침), `기록 + 최종 사진 (ZIP)`(화면에 보이는 기록만: `participants.csv` + `participants.json` + `impressions.csv` + `진행자_순번_ID/` 사진 폴더). CSV 단독 내보내기 버튼은 없앴다(ZIP 안에 있음).
 2. **참여자 검색 화면** (구글 이미지 검색처럼 검색창만 있음)
    - 과제 안내 한 줄 `TASK_LINE`: 홈에서는 검색창 위, 결과 화면에서는 위 검색창 아래에 작게 늘 보인다. 문장은 검색 그룹 진행 대본(1026_진행대본_2단계_처치_검색그룹)의 과제 문장 "다음에 혼자 지낼 방으로 가장 마음에 드는 방을 정해 주세요."에 하트 안내를 붙인 것. 예시 검색어·타깃 요소 단어·placeholder는 넣지 않는다.
-   - 결과는 사진 비율대로 칸 너비를 맞춘 줄 배치(`fitTiles`, 높이 190px/좁은 화면 130px). 3:2로 자르지 않는다(세로 사진의 바닥 러그·위쪽 벽 그림이 잘려 타깃 요소 노출이 달라지므로). 다음 디자인 작업에서 원래 비율을 유지하는 masonry로 바뀔 예정.
-   - 결과 사진의 하트 = "마음에 든 사진"에 담기/빼기. 크게 보기 모달에서도 담을 수 있다. 크게 보기(`openPreview`)와 결정 확인(`confirmFinal`)은 버튼 줄이 사진 **위**에 있고, 사진은 `max-height: calc(100dvh - 140px)`·`object-fit: contain`으로 원본 전체가 화면 안에 들어온다(세로 사진도 버튼이 밀려나지 않음).
+   - 결과 화면 위에는 고정 머리(`.g-top`, sticky): 가운데 검색창(48px 알약, 왼쪽 돋보기 = 검색 버튼, Enter도 됨) + 오른쪽 `마음에 든 사진 N`(좁은 화면은 하트+숫자만) + 그 아래 과제 안내 한 줄.
+   - 결과는 사진 원래 비율 그대로의 열 쌓기(masonry, `layoutMasonry`/`masonry`). 열 수는 창 너비로 정한다: 1440px 이상 5열, 1024 이상 4열, 768 이상 3열, 그 아래 2열(휴대폰도 2열). 간격 8px(768 미만 6px), 칸 모서리 16px. 순위 순서대로 **가장 짧은 열(같으면 왼쪽)** 에 놓으므로 순위 ≈ 읽는 순서이고, 같은 창 크기면 배치가 늘 같다. 칸 높이는 `열 너비 / ar`로 사진을 받기 전에 정한다(받는 동안 칸이 움직이지 않음). `ar`이 아직 없는 사진은 3:2로 잡았다가 로드되면 실제 비율로 다시 배치한다. 창 크기가 바뀌면(120ms 모아서) 다시 배치하고 칸 크기를 다시 잰다. 자르지 않는다(세로 사진의 바닥 러그·위쪽 벽 그림이 잘려 타깃 요소 노출이 달라지므로).
+   - 사진마다 오른쪽 위에 늘 보이는 `♡ 담기` 알약 버튼(담으면 먹색 `♥ 담김`). 보이는 높이 36px(좁은 화면 32px), 누르는 영역은 `::before`로 넓혀 40px 이상.
+   - `담기` = "마음에 든 사진"에 담기/빼기. 크게 보기 모달에서도 담을 수 있다. 크게 보기(`openPreview`): 넓은 화면(768px 이상)은 32px 모서리 카드에 사진 왼쪽 + 오른쪽 버튼 열(닫기, 담기, 아래에 이전/다음), 좁은 화면은 버튼 줄(이전·다음·담기·닫기)이 사진 **위**. 사진 크기는 `sizePreview`가 비율로 계산해 원본 전체가 화면 안에 들어오게 한다(세로 사진도 버튼이 밀려나지 않음, 창 크기가 바뀌면 다시 맞춤). 결정 확인(`confirmFinal`)도 제목·버튼이 사진 위에 있고 사진 크기를 비율로 맞춰 카드가 사진 폭으로 줄어든다.
    - 담은 사진이 1장 이상이면 화면 아래에 고정 줄 "담은 사진 N장 · 한 장 고르러 가기 →"(`syncFinishBar`)가 뜨고 모아 보기로 간다. 장수 제한·시간 표시는 없다(끝내는 시점은 참여자가 정함).
-   - `마음에 든 사진 N` 버튼이나 아래 고정 줄 → 모아 보기 → 한 장 선택 → `이 사진으로 결정` → 확인 모달 → 완료 화면.
+   - `마음에 든 사진 N` 버튼이나 아래 고정 줄 → 모아 보기(같은 masonry, 간격 16px/12px, 고른 사진은 먹색 테두리 + 왼쪽 위 체크, 아래 고정 줄 `이 사진으로 결정`) → 한 장 선택 → `이 사진으로 결정` → 확인 모달 → 완료 화면.
    - 완료 화면(`renderDoneUI`): 최종 사진(최대 60vh) 아래 큰 글씨 "진행자를 불러 주세요."(버튼 아님), 그 아래 작고 흐린 `다음 참여자` 버튼(진행자용, 예전 "연구자에게 알려 주세요."와 같은 동작). 다른 화면에서는 Ctrl+Shift+R 또는 오른쪽 아래 작은 점(연구자 패널)으로 나간다(`view` 없는 예전 방식일 때만).
    - 새로고침하면 마지막 검색 결과를 그대로 다시 보여 준다(`P.lastQ`, `P.resultLimit`, `restoreResults`; 같은 검색어·시드면 결과가 같다).
    - 참여자 화면에는 다운로드 버튼, 담기 개수 제한, 시간 표시가 없다(모두 의도된 것).
@@ -46,7 +55,7 @@
 
 `contains`는 사진에 보이는 타깃 요소(식물·러그·스탠드 조명·벽 그림·겹친 침구·담요)를 **보이면 다** 적은 표시로, 나중에 요소 포함 비율을 맞추는 데 쓴다. 타깃 요소는 태그(`식물·러그·액자·스탠드·담요`)로도 달려 검색되고, room-pool 스킬의 `build_pool.py`가 이 태그에서 `contains`를 자동으로 채운다. 검색에서 빼지는 않는다(`isExcluded = () => false`). 2026-10-27에 다섯째 요소를 `따뜻한 조명`에서 `겹친 침구·담요`로 바꿨다: `따뜻한조명` 태그는 일반 조명 태그로 남아 있고, `담요`는 침대 이불 위에 담요·스로우·베드러너(호텔식 보조 이불)를 한 겹 더 얹거나 접어 둔 사진에만 단다(소파에 걸친 담요, 쿠션만 있는 것은 제외). `TARGETS`의 `warm` 항목은 예전 contains가 남은 사진 때문에 지우지 않았다.
 
-앱 버전 `APP_VERSION`(날짜 + 순번, 예 `2026-10-27.2`)을 기록마다 붙인다. 화면이나 기록 방식을 바꾸면 올린다.
+앱 버전 `APP_VERSION`(날짜 + 순번, 지금 `2026-10-27.3` = 디자인 정리·masonry)을 기록마다 붙인다. 화면이나 기록 방식을 바꾸면 올린다.
 
 ### 노출 기록 (2026-10-27.2부터)
 
@@ -56,7 +65,7 @@
   - `source`: `search`(검색) · `more`(결과 더 보기, 새로 붙은 사진만) · `return`(모아 보기에서 돌아옴) · `reload`(새로고침 뒤 복원) · `rerender`(그 밖에 다시 그림)
   - `from`: 묶음 첫 사진의 순위(1부터). 사진의 순위 = `from + ids 안 위치`. `rank <= hits`면 검색어에 맞은 사진, 아니면 나머지로 채운 사진(`padded`)
   - `vis[id]`: 칸이 처음 50% 이상 화면에 들어온 때까지의 ms(`at` 기준, IntersectionObserver). 없으면 그려졌지만 화면에 안 들어옴
-  - `sz[id]`: 그린 칸의 실제 크기 `[너비, 높이]` px(`measureTiles`, 사진이 다 로드되고 칸 너비를 맞춘 뒤 잼). `vw`, `vh`는 그때 창 크기. 면적 가중 노출 계산용. 결과 더 보기로 다시 그리면 앞 묶음 사진의 크기도 최신 배치로 바뀐다
+  - `sz[id]`: 그린 칸의 실제 크기 `[너비, 높이]` px(`measureTiles`, masonry 배치 직후 잼. 칸 높이가 비율로 미리 정해지므로 사진 로드를 기다리지 않음). `vw`, `vh`는 그때 창 크기. 면적 가중 노출 계산용. 결과 더 보기로 다시 그리거나 창 크기가 바뀌어 다시 배치되면 크기가 최신 배치로 바뀌고, 그때 `vw`·`vh`도 그 창 크기로 맞춘다(2026-10-27.3부터)
 - `previews[]`: `{id, qn, q, openedAt, dwellMs, via, from, rank, w, h, vw, vh}` — 크게 보기 한 번. `via` = `click` · `key`(←/→) · `button`(이전/다음), `from` = `search` · `saved`, `w/h`는 그린 사진 크기. 닫거나 다른 사진으로 넘기면 `dwellMs`가 채워진다(창을 닫을 때는 `pagehide`에서). 새로고침 중에 열려 있던 것은 `dwellMs: null`
 - 모아 보기 화면과 결정 확인·완료 화면에 나온 사진은 따로 남기지 않는다(이미 담은 사진).
 
@@ -102,7 +111,7 @@
 
 - 연구자: `render`, `renderPool`, `drawGrid`, `drawEditor`, `addFiles`, `exportPool`, `importPool`, `confirmDelete`, `askParticipantId`, `renderArchive`, `archiveCSV`, `exportArchiveZip`
 - 연구자(진행 표시): `renderTopRight`, `updateLive`(1초마다), 기록 요약 `impStats`, 노출 CSV `impressionsCSV`
-- 참여자: `renderSearchUI`, `doSearch`, `drawResults(source, before)`, `fitTiles`, `toggleLike`(likeLog 기록), `syncLikes`/`syncFinishBar`(아래 고정 줄), `renderSavedUI`, `confirmFinal`, `renderDoneUI`, `openPreview(id, list, fromSaved, via)`, `restoreResults`
+- 참여자: `renderSearchUI`, `doSearch`, `drawResults(source, before)`, `layoutMasonry`/`masonry`(칸 배치, `arOf`·`masonryCols`), `sizePreview`, `toggleLike`(likeLog 기록), `syncLikes`/`syncFinishBar`(아래 고정 줄), `renderSavedUI`, `confirmFinal`, `renderDoneUI`, `openPreview(id, list, fromSaved, via)`, `restoreResults`
 - 노출 기록: `logShow`, `observeTiles`(IntersectionObserver), `measureTiles`, `pvOpen`/`pvClose`
 - 공통: `archiveCurrent`, `photoMetaFor`, `resetSession`, `savePick`/`savePickSoon`(400ms 모아 저장), `saveArch`, `urlFor`(blob URL 캐시), `ensureAspect`
 
@@ -116,6 +125,6 @@
 ## 남은 일
 
 - [ ] **사진별 CSV** (제안만 함, 사용자 답 대기): 담은 사진 한 장 = 한 줄. 열 `participant_id, photo, query_no, query, liked_at, where, is_final`. 참여자 기록 탭에 내보내기 버튼으로 추가. (노출 한 건 = 한 줄인 `impressions.csv`는 기록 ZIP 안에 생겼다. 담기 기록은 아직 `participants.json`의 `likeLog`에만 있다)
-- [ ] 결과 배치를 원래 비율을 유지하는 masonry로 바꾸는 디자인 작업 예정. 바꿀 때도 `drawResults`의 `logShow`·`observeTiles`·`measureTiles` 호출(칸 크기 측정)을 유지한다.
+- [x] 결과 배치를 원래 비율을 유지하는 masonry로 바꿈(2026-10-27.3). `drawResults`의 `logShow`·`observeTiles`·`measureTiles` 호출은 그대로이고, 배치가 바뀔 때마다 `measureTiles`를 다시 부른다.
 - [ ] 진행 대본(1026)은 "최소 4장", "연구자에게 알려 주세요."를 누른다고 되어 있다. 도구는 장수 제한이 없고 버튼 이름이 `다음 참여자`로 바뀌었으니 대본을 맞춰야 한다.
 - 기록은 브라우저 localStorage에만 있으므로 세션마다 기록 ZIP으로 백업하도록 안내되어 있다. 연구자 3명이 각자 PC에서 진행하고(참여자 P01~P12를 미리 나눠 배정), 나중에 의현이 각자의 ZIP을 `기록 불러오기`로 한 화면에 합친다. 새 기록 번호(`no`)는 같은 진행자의 자기 기록만 보고 매긴다(불러온 기록 제외).

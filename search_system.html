@@ -4,213 +4,257 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>검색</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
-/* Layout: researcher pool manager = grid + sticky editor; participant view = search column + saved tray. Researcher screens carry an amber strip. */
+/* 디자인 토큰: 흰 바탕 + 따뜻한 회색, 강조색은 짙은 먹색 하나. 모서리는 16px / 32px(모달) / 알약형만, 그림자 없음(모달 뒤 어둡게 깔리는 막만)
+   참여자 화면 = 위 고정 검색창 + 사진 비율 그대로의 칸 쌓기(masonry, layoutMasonry). 연구자 화면은 같은 토큰에 호박색 띠로 구분 */
 :root{
-  --bg:#F3F5F4; --surface:#FFFFFF; --sunk:#E9EDEB; --ink:#17201D; --muted:#5B6964; --line:#D8DFDC;
-  --accent:#2C6A56; --accent-ink:#FFFFFF; --accent-soft:#E0EDE7;
-  --research:#7A4C0C; --research-soft:#FBEFD9; --danger:#B3261E; --danger-soft:#FBE4E2;
-  --f-body:'IBM Plex Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
-  --f-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --bg:#FFFFFF; --surface:#FFFFFF; --card:#F6F6F3; --sunk:#F6F6F3; --sec:#E5E5E0; --sec-press:#C8C8C1;
+  --ink:#1D1D1A; --body:#33332E; --muted:#62625B; --ash:#91918C; --line:#DADAD3; --line-soft:#E5E5E0;
+  --accent:#262622; --accent-press:#000000; --accent-ink:#FFFFFF; --accent-soft:#ECECE7;
+  --research:#7A4C0C; --research-soft:#FBEFD9; --danger:#9E0A0A; --danger-soft:#FBE6E3;
+  --scrim:rgba(17,17,15,.55);
+  --r:16px; --r-lg:32px; --pill:999px;
+  --f-body:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  --f-mono:var(--f-body); /* 숫자는 본문 글꼴의 고정폭 숫자(tabular-nums)로. 한글이 섞인 줄에서 고정폭 글꼴이 튀지 않게 */
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0F1412; --surface:#172019; --sunk:#111915; --ink:#E5ECE8; --muted:#9AA9A3; --line:#2A3631;
-  --accent:#78C2A6; --accent-ink:#0E1512; --accent-soft:#1D3229;
-  --research:#F1C47E; --research-soft:#2D2313; --danger:#F28A82; --danger-soft:#3A1D1B; color-scheme:dark}}
+  --bg:#141412; --surface:#1B1B18; --card:#22221F; --sunk:#22221F; --sec:#2D2D29; --sec-press:#3B3B36;
+  --ink:#F2F2ED; --body:#DEDED7; --muted:#A5A59D; --ash:#7D7D76; --line:#363631; --line-soft:#2D2D29;
+  --accent:#EDEDE7; --accent-press:#FFFFFF; --accent-ink:#141412; --accent-soft:#2D2D29;
+  --research:#F1C47E; --research-soft:#2D2313; --danger:#F28A82; --danger-soft:#3A1D1B; --scrim:rgba(0,0,0,.7); color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0F1412; --surface:#172019; --sunk:#111915; --ink:#E5ECE8; --muted:#9AA9A3; --line:#2A3631;
-  --accent:#78C2A6; --accent-ink:#0E1512; --accent-soft:#1D3229;
-  --research:#F1C47E; --research-soft:#2D2313; --danger:#F28A82; --danger-soft:#3A1D1B; color-scheme:dark}
+  --bg:#141412; --surface:#1B1B18; --card:#22221F; --sunk:#22221F; --sec:#2D2D29; --sec-press:#3B3B36;
+  --ink:#F2F2ED; --body:#DEDED7; --muted:#A5A59D; --ash:#7D7D76; --line:#363631; --line-soft:#2D2D29;
+  --accent:#EDEDE7; --accent-press:#FFFFFF; --accent-ink:#141412; --accent-soft:#2D2D29;
+  --research:#F1C47E; --research-soft:#2D2313; --danger:#F28A82; --danger-soft:#3A1D1B; --scrim:rgba(0,0,0,.7); color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
+html{scrollbar-gutter:stable}
 html,body{min-height:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;
+body{margin:0;background:var(--bg);color:var(--body);font-family:var(--f-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
-h1,h2,h3{margin:0;text-wrap:balance;line-height:1.3} h1{font-size:24px} h2{font-size:18px;font-weight:600} h3{font-size:15px;font-weight:600}
+h1,h2,h3{margin:0;text-wrap:balance;line-height:1.25;color:var(--ink)} h1{font-size:24px;font-weight:700;letter-spacing:-.01em} h2{font-size:20px;font-weight:700} h3{font-size:15px;font-weight:600}
 p{margin:0}
 button,input,select,textarea{font:inherit;color:inherit}
-.wrap{max-width:1240px;margin:0 auto}
-.narrow{max-width:720px;margin:0 auto}
-.topbar{display:flex;align-items:center;gap:12px;justify-content:space-between;padding-block:14px;border-bottom:1px solid var(--line);margin-bottom:24px}
-.brand{font-weight:600}
-.timer{font-family:var(--f-mono);font-variant-numeric:tabular-nums;padding:4px 10px;border-radius:999px;background:var(--sunk)}
-.timer.low{background:var(--danger-soft);color:var(--danger)}
+.wrap{max-width:1280px;margin:0 auto}
+body.search-mode .wrap{max-width:1680px}
+.topbar{display:flex;align-items:center;gap:12px;justify-content:space-between;min-height:64px;padding-block:12px;border-bottom:1px solid var(--line);margin-bottom:24px}
+.brand{font-weight:700;color:var(--ink);font-size:16px}
 .stack{display:flex;flex-direction:column;gap:16px}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .between{justify-content:space-between}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px}
 .muted{color:var(--muted)} .small{font-size:13px} .mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
-.btn{white-space:nowrap;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 16px;cursor:pointer;font-weight:500}
-.btn:hover{border-color:var(--muted)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.num{font-variant-numeric:tabular-nums}
+/* 버튼: 기본 = 회색 면(secondary), primary = 먹색. 높이 40 / sm 32 */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;border:0;background:var(--sec);color:var(--ink);border-radius:var(--r);min-height:40px;padding:0 16px;cursor:pointer;font-weight:600;font-size:14px;line-height:1;text-decoration:none}
+.btn:hover{background:var(--sec-press)}
+.btn:active{background:var(--sec-press)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover,.btn.primary:active{background:var(--accent-press)}
 .btn.danger{color:var(--danger)}
 .btn.ghost{background:transparent}
-.btn.sm{padding:5px 10px;font-size:13px}
-.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost:hover{background:var(--sec)}
+.btn.sm{min-height:32px;padding:0 12px;font-size:13px}
+.btn.lg{min-height:48px;padding:0 24px;font-size:15px;border-radius:var(--pill)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn:disabled:hover{background:var(--sec)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-input[type=text],input[type=number],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 12px;width:100%}
-label.field{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted);font-weight:500}
-.research-strip{display:flex;align-items:center;gap:8px;background:var(--research-soft);color:var(--research);border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600}
-.research-strip::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--research)}
+input[type=text],input[type=number],input[type=search],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:0 14px;min-height:40px;width:100%;color:var(--ink)}
+input:focus{border-color:var(--ash);outline:none}
+input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+select{min-height:32px;padding:0 8px 0 12px;font-size:13px;cursor:pointer}
+#who{min-height:36px}
+.research-strip{display:flex;align-items:center;gap:8px;background:var(--research-soft);color:var(--research);border-radius:var(--r);padding:10px 14px;font-size:13px;font-weight:600}
+.research-strip::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--research)}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-.tabs button{border:0;background:none;padding:10px 14px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;font-weight:500}
+.tabs button{border:0;background:none;padding:12px 14px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:600}
 .tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent)}
-.stats{display:flex;gap:20px;flex-wrap:wrap;font-size:14px}
-.stats b{font-family:var(--f-mono);font-size:18px;display:block}
-/* pool manager */
-.manager{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start}
+.stats{display:flex;gap:28px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.stats b{font-family:var(--f-mono);font-size:20px;display:block;color:var(--ink);font-weight:600}
+/* 사진 풀 관리 */
+.manager{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start}
 .manager.solo{grid-template-columns:1fr}
 @media (max-width:900px){.manager{grid-template-columns:1fr}}
-.drop{border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--muted);background:var(--surface)}
+.drop{border:1.5px dashed var(--line);border-radius:var(--r);padding:24px;text-align:center;color:var(--muted);background:var(--card)}
+.drop b{color:var(--ink)}
 .drop.over{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
-.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-.pitem{position:relative;border:2px solid transparent;border-radius:10px;overflow:hidden;background:var(--surface);cursor:pointer;padding:0;text-align:left}
-.pitem[aria-pressed=true]{border-color:var(--accent)}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;align-items:start}
+.pitem{position:relative;display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;border:0;border-radius:var(--r);overflow:hidden;background:var(--card);cursor:pointer;padding:0;text-align:left;outline:2px solid transparent;outline-offset:2px}
+.pitem[aria-pressed=true]{outline-color:var(--accent)}
 .pitem img{display:block;width:100%;aspect-ratio:3/2;object-fit:cover;background:var(--sunk)}
-.pitem .meta{padding:6px 8px;font-size:12px;color:var(--muted);line-height:1.35;min-height:38px;word-break:break-all}
-.pitem .flag{position:absolute;left:6px;top:6px;font-size:11px;font-weight:600;border-radius:999px;padding:1px 8px}
+.pitem .meta{padding:8px 10px;font-size:12px;color:var(--muted);line-height:1.4;min-height:40px;word-break:break-all}
+.pitem .flag{position:absolute;left:8px;top:8px;font-size:11px;font-weight:700;border-radius:var(--pill);padding:2px 8px}
 .flag.ex{background:var(--danger);color:#fff}
 .flag.none{background:var(--research);color:#fff}
-.editor{position:sticky;top:12px;display:flex;flex-direction:column;gap:14px;max-height:calc(100vh - 24px);overflow:auto}
+.editor{position:sticky;top:16px;display:flex;flex-direction:column;gap:14px;max-height:calc(100vh - 32px);overflow:auto}
+.editor img{border-radius:var(--r)!important}
 .taggroup{display:flex;flex-direction:column;gap:6px}
 .taggroup>span{font-size:12px;color:var(--muted);font-weight:600}
-.tagbtns{display:flex;flex-wrap:wrap;gap:6px}
-.tagbtn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:13px;cursor:pointer}
-.tagbtn[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.tagbtn[aria-pressed=mixed]{background:var(--accent-soft);border-color:var(--accent)}
-.tagbtn.target[aria-pressed=true]{background:var(--danger);border-color:var(--danger);color:#fff}
-.tagbtn.target[aria-pressed=mixed]{background:var(--danger-soft);border-color:var(--danger)}
-.chk{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:14px;cursor:pointer}
-.chk input{accent-color:var(--accent)}
-/* participant */
-.task{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:20px;align-items:start}
-@media (max-width:860px){.task{grid-template-columns:1fr}}
-.tray{position:sticky;top:12px;display:flex;flex-direction:column;gap:12px}
-.tray-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.thumb{position:relative;border-radius:8px;overflow:hidden;background:var(--sunk);aspect-ratio:3/2}
-.thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
-.thumb .x{position:absolute;top:4px;right:4px;border:0;border-radius:50%;width:22px;height:22px;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;padding:0;line-height:22px}
-.progress{height:6px;border-radius:3px;background:var(--sunk);overflow:hidden}
-.progress>i{display:block;height:100%;background:var(--accent);transition:width .3s}
-.searchbar{display:flex;gap:8px}
-.searchbar input{font-size:16px;padding:12px 16px;border-radius:999px}
-.results{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
-.result{border:0;padding:0;background:var(--sunk);border-radius:8px;overflow:hidden;cursor:zoom-in;aspect-ratio:3/2;position:relative}
-.result img{width:100%;height:100%;object-fit:cover;display:block}
-.result .saved-badge{position:absolute;left:6px;top:6px;background:var(--accent);color:var(--accent-ink);font-size:12px;border-radius:999px;padding:1px 8px}
-.banner{padding:12px 16px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-weight:500}
-.empty{padding:40px 20px;text-align:center;color:var(--muted)}
-.modal{position:fixed;inset:0;background:rgba(10,14,12,.62);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
-.modal .panel{background:var(--surface);border-radius:12px;max-width:1000px;width:100%;max-height:100%;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
-.modal .panel>img{width:100%;border-radius:8px;display:block}
-.pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
-.pick{border:2px solid transparent;border-radius:10px;padding:0;background:none;cursor:pointer;overflow:hidden}
-.pick[aria-pressed=true]{border-color:var(--accent)}
-.pick img{display:block;width:100%;aspect-ratio:3/2;object-fit:cover}
-.tablewrap{overflow-x:auto}
+.tagbtns{display:flex;flex-wrap:wrap;gap:4px}
+.tagbtn{border:0;background:var(--card);border-radius:var(--pill);padding:4px 10px;font-size:13px;cursor:pointer;color:var(--body)}
+.tagbtn:hover{background:var(--sec)}
+.tagbtn[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+.tagbtn[aria-pressed=mixed]{background:var(--sec-press);color:var(--ink)}
+.tagbtn.target[aria-pressed=true]{background:var(--danger);color:#fff}
+.tagbtn.target[aria-pressed=mixed]{background:var(--danger-soft);color:var(--danger)}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
 th{font-weight:600;color:var(--muted);white-space:nowrap}
 td.num{text-align:right;font-family:var(--f-mono)}
-.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:14px} .kv dt{color:var(--muted)} .kv dd{margin:0}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:14px} .kv dt{color:var(--muted)} .kv dd{margin:0;color:var(--ink)}
 .pool-loading{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);color:var(--muted);z-index:80;font-size:15px}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;z-index:70;font-size:14px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(88px + env(safe-area-inset-bottom,0px));background:var(--accent);color:var(--accent-ink);padding:10px 18px;border-radius:var(--pill);z-index:70;font-size:14px;font-weight:500;max-width:calc(100vw - 32px)}
 #rx-toggle{position:fixed;right:8px;bottom:8px;width:14px;height:14px;border-radius:50%;border:0;background:var(--line);opacity:.5;cursor:pointer;z-index:60}
-#rx-panel{position:fixed;right:12px;bottom:32px;width:min(320px,calc(100vw - 24px));background:var(--surface);border:1px solid var(--research);border-radius:12px;padding:14px;z-index:61;display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
-.prog-bar{height:8px;border-radius:4px;background:var(--sunk);overflow:hidden}.prog-bar i{display:block;height:100%;background:var(--accent)}
+#rx-panel{position:fixed;right:12px;bottom:32px;width:min(320px,calc(100vw - 24px));background:var(--surface);border:1px solid var(--research);border-radius:var(--r);padding:14px;z-index:61;display:flex;flex-direction:column;gap:10px}
+.prog-bar{height:6px;border-radius:3px;background:var(--sec);overflow:hidden}.prog-bar i{display:block;height:100%;background:var(--accent)}
+.empty{padding:48px 20px;text-align:center;color:var(--muted);line-height:1.7}
+a.btn{text-decoration:none}
 
-/* participant: search-engine look */
+/* 모달: 어두운 막 + 32px 모서리 카드 */
+.modal{position:fixed;inset:0;background:var(--scrim);display:flex;align-items:center;justify-content:center;z-index:50;padding:24px}
+.modal .panel{background:var(--surface);color:var(--body);border-radius:var(--r-lg);max-width:1000px;width:100%;max-height:100%;overflow:auto;padding:28px;display:flex;flex-direction:column;gap:14px}
+.g-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;background:var(--accent);color:var(--accent-ink);border-radius:var(--pill);min-height:44px;padding:0 22px;cursor:pointer;font-weight:700;font-size:15px;white-space:nowrap}
+.g-btn:hover,.g-btn:active{background:var(--accent-press)}
+.g-btn:disabled{opacity:.35;cursor:not-allowed}
+.g-btn:disabled:hover{background:var(--accent)}
+
+/* ===== 참여자 화면 ===== */
 body.search-mode .topbar{display:none}
-.g-home{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding-top:40px}
-.g-logo{font-size:44px;font-weight:700;letter-spacing:-.03em;color:var(--ink);background:none;border:0;cursor:default;padding:0}
-.g-logo.sm{font-size:22px;cursor:pointer;white-space:nowrap}
-.g-form{display:flex;align-items:center;width:min(640px,100%);border:1px solid var(--line);border-radius:999px;background:var(--surface);padding:4px 4px 4px 20px;box-shadow:0 1px 6px rgba(32,40,36,.08)}
-.g-form:focus-within{box-shadow:0 2px 10px rgba(32,40,36,.16)}
-.g-form input{flex:1;min-width:0;border:0;background:none;font-size:17px;padding:10px 0;outline:none}
-.g-btn{border:0;background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:9px 20px;cursor:pointer;font-weight:600;white-space:nowrap}
-.g-top{display:flex;align-items:center;gap:20px;padding-block:18px;border-bottom:1px solid var(--line);margin-bottom:18px;flex-wrap:wrap}
-.g-top .g-form{width:min(640px,100%)}
-.g-grid{display:flex;flex-wrap:wrap;gap:8px}
-.g-item{height:190px;flex:1 1 250px;border:0;padding:0;border-radius:8px;overflow:hidden;background:var(--sunk);cursor:pointer;max-width:100%}
-.g-item img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .2s}
-.g-item:hover img{transform:scale(1.03)}
-.g-fill{flex:10 1 0;height:0}
-@media (max-width:520px){.g-item{height:130px}.g-logo{font-size:34px}}
-@media (prefers-reduced-motion:reduce){.g-item img{transition:none}}
-a.btn{text-decoration:none;display:inline-block}
-
-/* likes · saved · final */
-.g-item{position:relative}
-.g-open{border:0;padding:0;margin:0;width:100%;height:100%;background:none;cursor:pointer;display:block}
-.g-like{position:absolute;top:8px;right:8px;width:38px;height:38px;border-radius:50%;border:0;display:grid;place-items:center;cursor:pointer;background:rgba(255,255,255,.88);color:#8a948f;box-shadow:0 1px 4px rgba(0,0,0,.18);transition:transform .12s}
-.g-like:hover{transform:scale(1.08)}
-.g-like.on{background:var(--accent);color:var(--accent-ink)}
-.g-zoom{position:absolute;bottom:8px;right:8px;width:34px;height:34px;border-radius:50%;border:0;display:grid;place-items:center;cursor:zoom-in;background:rgba(255,255,255,.88);color:#3a4440}
-.g-check{position:absolute;top:8px;left:8px;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:none;place-items:center;font-weight:700}
-.g-pick .g-item{outline:3px solid transparent;outline-offset:-3px}
-.g-pick .g-item.sel{outline-color:var(--accent)}
+/* 검색창: 회색 면 알약, 왼쪽 돋보기(누르면 검색), 그림자 없음 */
+.g-form{display:flex;align-items:center;width:100%;height:48px;border:1px solid transparent;border-radius:var(--pill);background:var(--card);padding:0 16px 0 4px}
+.g-form:focus-within{background:var(--surface);border-color:var(--ash)}
+.g-form input{flex:1;min-width:0;border:0;background:none;font-size:16px;height:100%;padding:0 4px;outline:none;color:var(--ink);min-height:0}
+.g-form input:focus,.g-form input:focus-visible{outline:none;border:0}
+.g-form input::-webkit-search-cancel-button{cursor:pointer}
+.g-go{flex:none;display:grid;place-items:center;width:40px;height:40px;border:0;border-radius:50%;background:none;color:var(--muted);cursor:pointer;padding:0}
+.g-go:hover{color:var(--ink);background:var(--sec)}
+/* 홈 */
+.g-bar{display:flex;justify-content:flex-end;padding-top:16px}
+.g-home{min-height:72vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding-top:24px}
+.g-home .g-form{width:min(640px,100%)}
+.g-task{color:var(--muted);font-size:16px;line-height:1.55;text-align:center;max-width:720px;margin:0;word-break:keep-all;text-wrap:balance}
+/* 결과 화면 위 고정 머리: 가운데 검색창 + 오른쪽 "마음에 든 사진 N", 아래 과제 안내 한 줄 */
+.g-top{position:sticky;top:0;z-index:30;background:var(--bg);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,720px) minmax(0,1fr);align-items:center;column-gap:16px;row-gap:6px;padding-block:12px 10px;margin-bottom:16px;
+  box-shadow:0 0 0 100vmax var(--bg),0 1px 0 100vmax var(--line);clip-path:inset(0 -100vmax -1px)}
+.g-top .g-form{grid-column:2}
+.g-top .g-saved{grid-column:3;justify-self:end}
+.g-task.sm{grid-column:2;font-size:13px;text-align:center;line-height:1.45;padding-inline:8px}
+.g-saved{display:inline-flex;align-items:center;gap:8px;border:0;background:var(--card);border-radius:var(--pill);height:48px;padding:0 18px;cursor:pointer;font-weight:600;font-size:14px;color:var(--muted);white-space:nowrap}
+.g-saved:hover{background:var(--sec)}
+.g-saved .hrt path{fill:currentColor;stroke:none}
+.g-saved.has{color:var(--ink)}
+.g-saved b{font-variant-numeric:tabular-nums;font-weight:700;min-width:1ch;text-align:center}
+@media (max-width:767px){
+  .g-top{grid-template-columns:minmax(0,1fr) auto;column-gap:8px;padding-block:10px 8px;margin-bottom:12px}
+  .g-top .g-form{grid-column:1}.g-top .g-saved{grid-column:2}
+  .g-task.sm{grid-column:1/-1;text-align:left;padding-inline:4px;font-size:12.5px}
+  .g-top .g-saved{padding:0 14px}.g-top .g-saved .lbl{display:none}
+}
+/* 사진 칸 쌓기: 칸 위치·크기는 layoutMasonry가 사진 비율(ar)로 정한다 (자르지 않음, 순위대로 가장 짧은 열에) */
+.g-grid{position:relative;width:100%}
+.g-grid>.empty{position:static}
+.g-item{position:absolute;left:0;top:0;border-radius:var(--r);overflow:hidden;background:var(--card)}
+.g-open{display:block;border:0;padding:0;margin:0;width:100%;height:100%;background:none;cursor:zoom-in;position:relative}
+.g-open img{display:block;width:100%;height:100%;object-fit:cover}
+.g-open::after{content:"";position:absolute;inset:0;background:#000;opacity:0;transition:opacity .15s}
+.g-open:hover::after{opacity:.08}
+.g-pick .g-open{cursor:pointer}
+/* 담기 버튼: 사진 오른쪽 위, 늘 보임. 보이는 높이 36px(좁은 화면 32px), 누르는 영역은 위아래로 넓혀 44px */
+.g-like{position:absolute;top:8px;right:8px;display:inline-flex;align-items:center;gap:5px;height:36px;padding:0 13px 0 11px;border:0;border-radius:var(--pill);cursor:pointer;
+  background:rgba(255,255,255,.94);color:#262622;font-weight:700;font-size:13px;line-height:1;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+.g-like::before{content:"";position:absolute;inset:-4px}
+.g-like:hover{background:#fff}
+.g-like.on{background:#262622;color:#fff;box-shadow:none}
+.g-like.on:hover{background:#000}
+.hrt{flex:none;display:block}
+.hrt path{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}
+.on .hrt path{fill:currentColor;stroke:currentColor}
+.g-zoom{position:absolute;bottom:8px;right:8px;width:40px;height:40px;border-radius:50%;border:0;display:grid;place-items:center;cursor:zoom-in;background:rgba(255,255,255,.94);color:#262622;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+.g-zoom:hover{background:#fff}
+.g-check{position:absolute;top:8px;left:8px;width:32px;height:32px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:none;place-items:center;box-shadow:0 0 0 2px var(--bg)}
+.g-pick .g-item{overflow:visible}
+.g-pick .g-open{border-radius:var(--r);overflow:hidden}
+.g-pick .g-item.sel{outline:3px solid var(--accent);outline-offset:2px}
 .g-pick .g-item.sel .g-check{display:grid}
-.g-saved{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:9px 16px;cursor:pointer;font-weight:600;color:var(--muted);white-space:nowrap}
-.g-saved.has{color:var(--accent);border-color:var(--accent)}
-.g-saved b{font-family:var(--f-mono);min-width:1.4em;text-align:center}
-.g-bar{display:flex;justify-content:flex-end;padding-top:18px}
-.g-title{font-size:22px}
-.g-guide{margin-bottom:14px}
-.g-decide{position:sticky;bottom:0;display:flex;justify-content:flex-end;align-items:center;gap:16px;padding:16px 0 calc(16px + env(safe-area-inset-bottom,0px));margin-top:18px;background:var(--bg);border-top:1px solid var(--line)}
-.g-btn:disabled{opacity:.45;cursor:not-allowed}
-.g-like-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--accent);background:var(--surface);color:var(--accent);border-radius:999px;padding:9px 18px;cursor:pointer;font-weight:600;white-space:nowrap}
+@media (max-width:767px){.g-like{height:32px;padding:0 11px 0 9px;font-size:12.5px;top:6px;right:6px}.g-like::before{inset:-6px -4px}.g-zoom{bottom:6px;right:6px}.g-check{top:6px;left:6px}}
+@media (prefers-reduced-motion:reduce){.g-open::after{transition:none}}
+.g-more{display:flex;justify-content:center;margin-top:24px}
+.g-none{padding:48px 0;text-align:center;color:var(--muted)}
+/* 담은 사진이 있으면 아래에 고르러 가는 줄 */
+.g-finish{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;justify-content:center;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1px solid var(--line)}
+.g-finish .g-btn{min-height:48px;font-size:15px;padding:0 28px;max-width:100%}
+body.has-finish #main{padding-bottom:80px}
+/* 모아 보기 */
+.g-head{position:sticky;top:0;z-index:30;background:var(--bg);display:flex;align-items:center;gap:16px;padding-block:12px;margin-bottom:16px;flex-wrap:wrap;
+  box-shadow:0 0 0 100vmax var(--bg),0 1px 0 100vmax var(--line);clip-path:inset(0 -100vmax -1px)}
+.g-title{font-size:20px;font-weight:700}
+.g-title b{font-variant-numeric:tabular-nums}
+.g-guide{margin:0 0 16px;color:var(--muted);font-size:15px}
+#saved{margin-bottom:96px}
+.g-decide{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;justify-content:center;align-items:center;gap:16px;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1px solid var(--line)}
+.g-decide .g-btn{min-height:48px;padding:0 28px}
+/* 크게 보기: 넓은 화면 = 사진 왼쪽 + 오른쪽 버튼 열, 좁은 화면 = 버튼 줄이 사진 위. 사진 크기는 sizePreview가 화면 안에 맞춘다 */
+.modal .panel.pv{max-width:none;width:auto;padding:16px;gap:24px;flex-direction:row-reverse;align-items:stretch;overflow:hidden}
+.pv-img{display:block;border-radius:var(--r);background:var(--card);object-fit:contain;flex:none}
+.pv-side{flex:none;width:260px;display:flex;flex-direction:column;gap:12px;padding:4px 4px 4px 0}
+.pv-side [data-close]{align-self:flex-end}
+.pv-act{margin-top:8px}
+.pv-act>*{width:100%}
+.pv-nav{margin-top:auto;display:flex;gap:8px}
+.pv-nav .btn{flex:1}
+.g-like-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;background:var(--sec);color:var(--ink);border-radius:var(--pill);min-height:48px;padding:0 22px;cursor:pointer;font-weight:700;font-size:15px;white-space:nowrap}
+.g-like-btn:hover{background:var(--sec-press)}
 .g-like-btn.on{background:var(--accent);color:var(--accent-ink)}
+.g-like-btn.on:hover{background:var(--accent-press)}
+@media (max-width:767px){
+  .modal{padding:8px}
+  .modal .panel{padding:20px;border-radius:24px}
+  .modal .panel.pv{flex-direction:column;padding:10px;gap:10px;border-radius:24px}
+  .pv-side{width:auto;flex-direction:row;align-items:center;gap:6px;padding:0}
+  .pv-nav{order:1;margin:0;gap:6px}.pv-nav .btn{flex:none;padding:0 12px}
+  .pv-act{order:2;margin:0 0 0 auto}.pv-act>*{width:auto;min-height:40px;padding:0 16px;font-size:14px}
+  .pv-side [data-close]{order:3;align-self:auto}
+  .pv-img{border-radius:14px;margin-inline:auto}
+}
+/* 결정 확인 */
 .g-confirm{max-width:720px}
 .g-confirm h2{font-size:22px}
-/* 크게 보기·결정 확인: 버튼 줄을 사진 위에 두고, 사진은 화면 안에 다 들어오게 줄인다 (세로 사진도 원본 전체) */
-.modal .panel.pv{max-width:1200px;overflow:hidden}
-.modal .panel.pv>img,.modal .panel.g-confirm>img{width:auto;height:auto;max-width:100%;max-height:calc(100vh - 140px);max-height:calc(100dvh - 140px);object-fit:contain;margin:0 auto;background:var(--sunk)}
-.modal .panel.g-confirm>img{max-height:calc(100vh - 230px);max-height:calc(100dvh - 230px)}
-.pv-bar{flex-wrap:nowrap}
-.pv-bar .btn,.pv-bar .g-like-btn{padding-inline:12px}
-@media (max-width:520px){.modal{padding:8px}.modal .panel{padding:10px;gap:8px}.pv-bar{gap:6px}.pv-bar .row{gap:6px;flex-wrap:nowrap}.pv-bar .btn.sm{padding:5px 8px}.pv-bar .g-like-btn{padding:8px 12px}
-  .modal .panel.pv>img{max-height:calc(100vh - 90px);max-height:calc(100dvh - 90px)}.modal .panel.g-confirm>img{max-height:calc(100dvh - 200px)}}
-.g-done{display:flex;flex-direction:column;align-items:center;gap:10px;padding-block:20px 8px;text-align:center}
-.g-done img{max-width:min(960px,100%);max-height:60vh;max-height:60dvh;width:auto;height:auto;object-fit:contain;border-radius:12px;display:block}
-.g-done h1{font-size:22px}
-.g-call{font-size:28px;font-weight:700;margin-top:8px}
-.g-next{margin-top:18px;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;opacity:.75}
-.g-next:hover{opacity:1;color:var(--ink)}
-/* 과제 안내 한 줄 (홈: 검색창 위, 결과 화면: 위 검색창 아래 작게) */
-.g-task{color:var(--muted);font-size:16px;text-align:center;max-width:640px;margin:0}
-.g-task.sm{flex-basis:100%;font-size:13px;text-align:left;margin-top:-10px}
-/* 담은 사진이 있으면 아래에 고르러 가는 줄 */
-.g-finish{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;justify-content:center;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -2px 10px rgba(0,0,0,.06)}
-.g-finish .g-btn{font-size:16px;padding:11px 26px}
-body.has-finish #main{padding-bottom:72px}
+.modal .panel.g-confirm>img{display:block;width:auto;height:auto;max-width:100%;max-height:calc(100vh - 220px);max-height:calc(100dvh - 220px);object-fit:contain;margin:0 auto;border-radius:var(--r);background:var(--card)}
+@media (max-width:767px){.modal .panel.g-confirm>img{max-height:calc(100dvh - 230px)}}
+.modal .panel.g-cf{width:auto;max-width:100%;min-width:min(520px,100%)}
+.modal .panel.g-cf>img{max-height:none}
+/* 완료 화면 */
+.g-done{display:flex;flex-direction:column;align-items:center;gap:10px;padding-block:24px 8px;text-align:center}
+.g-done img{max-width:min(960px,100%);max-height:60vh;max-height:60dvh;width:auto;height:auto;object-fit:contain;border-radius:var(--r);display:block;margin-top:6px}
+.g-done h1{font-size:20px;font-weight:600}
+.g-done-kicker{color:var(--muted);font-weight:600;font-size:14px}
+.g-call{font-size:30px;font-weight:700;color:var(--ink);letter-spacing:-.01em;margin-top:10px}
+.g-next{margin-top:16px;border:0;background:transparent;color:var(--muted);border-radius:var(--pill);padding:6px 12px;font-size:12px;cursor:pointer;opacity:.7}
+.g-next:hover{opacity:1;color:var(--ink);background:var(--card)}
+/* 시작 화면 */
+#start-form{width:min(440px,100%);display:flex;flex-direction:column;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:32px}
+#start-form label{margin-top:10px;font-weight:600}
+#pid-in,#who-in{font-size:18px;min-height:52px;padding:0 16px}
+#start-form .row{margin-top:18px}
 /* 연구자 화면: 진행 중 참여자 경과 */
 .live{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
-.live-over{display:inline-flex;align-items:center;gap:6px;background:var(--research-soft);color:var(--research);border:1px solid var(--research);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700}
-.g-exit{margin-top:24px;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:7px 16px;font-size:13px;cursor:pointer}
-.g-exit:hover{color:var(--ink);border-color:var(--muted)}
-.g-notify{border:0;background:none;padding:6px 10px;color:var(--muted);font:inherit;cursor:pointer;border-radius:6px}
-.g-notify:hover{color:var(--ink)}
-.g-done-kicker{color:var(--accent);font-weight:700}
-.g-strip{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
-.g-strip figure{margin:0;flex:0 0 160px;display:flex;flex-direction:column;gap:4px}
-.g-strip img{width:160px;aspect-ratio:3/2;object-fit:cover;border-radius:6px;border:3px solid transparent}
-.g-strip figure.fin img{border-color:var(--accent)}
-.g-strip figcaption{font-size:11px;color:var(--muted);word-break:break-all}
-@media (prefers-reduced-motion:reduce){.g-like{transition:none}}
-
+.live-over{display:inline-flex;align-items:center;gap:6px;background:var(--research-soft);color:var(--research);border:1px solid var(--research);border-radius:var(--pill);padding:3px 10px;font-size:12px;font-weight:700}
+.g-strip{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 4px}
+.g-strip figure{margin:0;flex:0 0 160px;display:flex;flex-direction:column;gap:6px}
+.g-strip img{width:160px;aspect-ratio:3/2;object-fit:cover;border-radius:12px;display:block;outline:3px solid transparent;outline-offset:-3px}
+.g-strip figure.fin img{outline-color:var(--accent)}
+.g-strip figcaption{font-size:11px;color:var(--muted);word-break:break-all;line-height:1.4}
 .arch h3{font-size:18px}
-.arch-label{width:min(240px,100%)!important;padding:6px 10px!important;font-size:17px;font-weight:700}
-#pid-in,#who-in{font-size:20px;padding:12px 14px}
-#start-form{width:min(480px,100%);display:flex;flex-direction:column;gap:6px}
-#start-form label{margin-top:8px}
-.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600}
-.pill.ok{background:var(--accent-soft);color:var(--accent)}
+.arch-label{width:240px!important;max-width:100%;min-height:36px!important;padding:0 12px!important;font-size:17px;font-weight:700;border-radius:12px!important}
+.pill{display:inline-flex;align-items:center;min-height:24px;padding:0 10px;border-radius:var(--pill);font-size:12px;font-weight:600;background:var(--card);color:var(--muted)}
+.pill.ok{background:var(--accent-soft);color:var(--ink)}
 .pill.warn{background:var(--research-soft);color:var(--research)}
-.ph-missing{width:160px;aspect-ratio:3/2;border-radius:6px;background:var(--sunk);display:grid;place-items:center;font-size:12px;color:var(--muted)}
+.ph-missing{width:160px;aspect-ratio:3/2;border-radius:12px;background:var(--card);display:grid;place-items:center;font-size:12px;color:var(--muted)}
 .q-list{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:2px}
 .q-list li{line-height:1.5}
-.q-tag{display:block;margin-top:2px;color:var(--accent);font-weight:600}
+.q-tag{display:block;margin-top:2px;color:var(--ink);font-weight:600}
 </style>
 
 <div class="wrap">
@@ -280,7 +324,7 @@ const SYN = {
 };
 const MAX_EDGE = 1600, THUMB_EDGE = 420;
 // 앱 버전: 기록마다 붙는다. 화면·기록 방식을 바꾸면 날짜와 순번을 올린다
-const APP_VERSION = '2026-10-27.2';
+const APP_VERSION = '2026-10-27.3';
 // 참여자 화면의 과제 안내 한 줄 (검색 그룹 진행 대본의 과제 문장 + 하트 안내)
 const TASK_LINE = '다음에 혼자 지낼 방으로 가장 마음에 드는 방을 정해 주세요. 마음에 드는 사진은 하트를 눌러 담아 주세요.';
 
@@ -739,7 +783,8 @@ function logShow(source, list, from){
 // 그린 칸의 실제 크기(px, [너비, 높이])를 그 사진을 처음 그린 묶음에 적는다 (면적으로 가중한 노출 계산용)
 function measureTiles(box){
   if (!box.isConnected) return; let ch = false;
-  $$('.g-item', box).forEach(t => { const e = (P.shows || [])[(S.owner[t.dataset.id] || 0) - 1]; if (!e || !e.sz) return; const r = t.getBoundingClientRect(), v = [Math.round(r.width), Math.round(r.height)], o = e.sz[t.dataset.id]; if (!o || o[0] !== v[0] || o[1] !== v[1]){ e.sz[t.dataset.id] = v; ch = true; } });
+  // 창 크기가 바뀌어 다시 배치되면 크기와 함께 vw·vh도 그때 창 크기로 맞춘다 (sz와 vw·vh가 같은 배치를 가리키게)
+  $$('.g-item', box).forEach(t => { const e = (P.shows || [])[(S.owner[t.dataset.id] || 0) - 1]; if (!e || !e.sz) return; const r = t.getBoundingClientRect(), v = [Math.round(r.width), Math.round(r.height)], o = e.sz[t.dataset.id]; if (!o || o[0] !== v[0] || o[1] !== v[1]){ e.sz[t.dataset.id] = v; e.vw = window.innerWidth; e.vh = window.innerHeight; ch = true; } });
   if (ch) savePickSoon();
 }
 let IO = null;
@@ -779,12 +824,15 @@ function toggleLike(id){
   if (!P.startedAt) P.startedAt = nowIso();
   savePick(); syncLikes();
 }
-const HEART = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.5 8.1 3.6 5 6.8 5c2 0 3.4 1.1 4.2 2.4h2C13.8 6.1 15.2 5 17.2 5c3.2 0 5.3 3.1 4.1 6.3-1.8 4.6-9.3 9.2-9.3 9.2z" fill="currentColor"/></svg>';
+// 하트: 담기 전에는 테두리만, 담으면 채움 (CSS .on .hrt)
+const heart = (n = 18) => `<svg class="hrt" viewBox="0 0 24 24" width="${n}" height="${n}" aria-hidden="true"><path d="M12 20s-7.2-4.4-8.9-8.8C1.9 8.2 3.9 5.2 7 5.2c2 0 3.3 1.1 5 3 1.7-1.9 3-3 5-3 3.1 0 5.1 3 3.9 6-1.7 4.4-8.9 8.8-8.9 8.8z"/></svg>`;
+const HEART = heart(18);
+const likeText = id => isLiked(id) ? '담김' : '담기';
 function syncLikes(){
   $$('[data-like]').forEach(b => { const on = isLiked(b.dataset.like); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.setAttribute('aria-label', on ? '마음에 든 사진에서 빼기' : '마음에 든 사진에 담기'); });
   $$('.g-saved-count').forEach(n => n.textContent = P.liked.length);
   $$('.g-saved').forEach(n => n.classList.toggle('has', P.liked.length > 0));
-  $$('[data-like-label]').forEach(n => n.textContent = isLiked(n.dataset.likeLabel) ? '마음에 든 사진에 담김' : '마음에 들어요');
+  $$('[data-like-label]').forEach(n => n.textContent = likeText(n.dataset.likeLabel));
   syncFinishBar();
 }
 // 검색 화면 아래 고정 줄: 담은 사진이 1장 이상이면 "한 장 고르러 가기". 장수 제한·시간 표시는 없다
@@ -802,20 +850,65 @@ function syncFinishBar(){
   document.body.classList.add('has-finish');
 }
 const goSaved = () => { P.view = 'saved'; P._sel = null; savePick(); renderSearchUI(); window.scrollTo(0,0); };
-const savedBtn = () => `<button class="g-saved ${P.liked.length ? 'has' : ''}" id="to-saved" type="button">${HEART}<span>마음에 든 사진</span><b class="g-saved-count">${P.liked.length}</b></button>`;
+const savedBtn = () => `<button class="g-saved ${P.liked.length ? 'has' : ''}" id="to-saved" type="button" aria-label="마음에 든 사진 보기">${heart(16)}<span class="lbl">마음에 든 사진</span><b class="g-saved-count">${P.liked.length}</b></button>`;
+const MAG = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M10.5 4a6.5 6.5 0 0 1 5.2 10.4l4.4 4.4-1.4 1.4-4.4-4.4A6.5 6.5 0 1 1 10.5 4zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z" fill="currentColor"/></svg>';
+const CHECK = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const searchForm = (val) => `<form class="g-form" id="gform" role="search"><button class="g-go" type="submit" aria-label="검색">${MAG}</button><input type="search" id="q" aria-label="검색어" autocomplete="off" enterkeyhint="search"${val ? ` value="${esc(val)}"` : ''}></form>`;
 function tile(p, mode, rank){
   return `<div class="g-item${mode==='pick' && P._sel===p.id ? ' sel' : ''}" data-id="${p.id}"${rank ? ` data-rank="${rank}"` : ''}>
     <button class="g-open" type="button" aria-label="${mode==='pick' ? '이 사진 고르기' : '크게 보기'}"><img loading="lazy" alt="방 사진" src="${urlFor(p,'thumb')}"></button>
-    ${mode==='pick' ? `<button class="g-zoom" type="button" data-zoom="${p.id}" aria-label="크게 보기"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M10.5 4a6.5 6.5 0 0 1 5.2 10.4l4.4 4.4-1.4 1.4-4.4-4.4A6.5 6.5 0 1 1 10.5 4zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z" fill="currentColor"/></svg></button><span class="g-check" aria-hidden="true">✓</span>` : ''}
-    <button class="g-like${isLiked(p.id) ? ' on' : ''}" type="button" data-like="${p.id}" aria-pressed="${isLiked(p.id)}">${HEART}</button>
+    ${mode==='pick' ? `<button class="g-zoom" type="button" data-zoom="${p.id}" aria-label="크게 보기">${MAG}</button><span class="g-check" aria-hidden="true">${CHECK}</span>` : ''}
+    <button class="g-like${isLiked(p.id) ? ' on' : ''}" type="button" data-like="${p.id}" aria-pressed="${isLiked(p.id)}" aria-label="${isLiked(p.id) ? '마음에 든 사진에서 빼기' : '마음에 든 사진에 담기'}">${HEART}<span data-like-label="${p.id}">${likeText(p.id)}</span></button>
   </div>`;
 }
-// 사진 비율대로 칸 너비를 맞춘다 (자르지 않고 원래 비율 유지). 다 맞춘 뒤 onSettle로 칸 크기를 잰다
-function fitTiles(box, onSettle){
-  let t = null; const settle = () => { if (!onSettle) return; clearTimeout(t); t = setTimeout(onSettle, 250); };
-  $$('.g-item', box).forEach(tl => { const img = tl.querySelector('img'); const fit = () => { if (img.naturalWidth) tl.style.flexBasis = Math.round(tl.offsetHeight * img.naturalWidth / img.naturalHeight || 190 * img.naturalWidth / img.naturalHeight) + 'px'; settle(); }; img.complete ? fit() : img.addEventListener('load', fit); });
-  settle();
+/* 사진 칸 쌓기 (masonry): 열 수는 창 너비로 정하고(1440↑ 5, 1024↑ 4, 768↑ 3, 그 아래 2), 순위 순서대로 가장 짧은 열(같으면 왼쪽)에 놓는다.
+   칸 높이 = 열 너비 / 사진 비율(ar). 사진을 받기 전에 자리가 정해지므로 받는 동안 칸이 움직이지 않는다. 같은 창 크기면 배치도 늘 같다.
+   ar이 아직 없는 사진은 3:2로 잡아 두고, 사진이 로드되면 실제 비율로 다시 배치한다 */
+const AR = {}; // 사진 파일에서 잰 비율 (p.ar이 아직 없을 때)
+const arOf = id => { const p = photoById(id); return (p && p.ar > 0) ? p.ar : (AR[id] || 1.5); };
+const masonryCols = () => { const w = window.innerWidth; return w >= 1440 ? 5 : w >= 1024 ? 4 : w >= 768 ? 3 : 2; };
+function layoutMasonry(box){
+  if (!box || !box.isConnected) return false;
+  const tiles = $$('.g-item', box); if (!tiles.length){ box.style.height = ''; return false; }
+  const n = masonryCols(), mob = window.innerWidth < 768, gap = box.classList.contains('g-pick') ? (mob ? 12 : 16) : (mob ? 6 : 8); // 모아 보기는 고른 사진 테두리가 들어가게 간격을 넓힌다
+  for (let pass = 0; pass < 3; pass++){
+    const W = box.clientWidth, cw = (W - gap * (n - 1)) / n, hs = new Array(n).fill(0);
+    tiles.forEach(t => {
+      let c = 0; for (let k = 1; k < n; k++) if (hs[k] < hs[c] - .5) c = k;
+      const h = Math.round(cw / arOf(t.dataset.id));
+      t.style.left = (c * (cw + gap)).toFixed(2) + 'px'; t.style.top = hs[c] + 'px'; t.style.width = cw.toFixed(2) + 'px'; t.style.height = h + 'px';
+      hs[c] += h + gap;
+    });
+    box.style.height = Math.max(0, Math.max(...hs) - gap) + 'px';
+    box.classList.add('laid');
+    if (box.clientWidth === W) break; // 세로 스크롤 막대가 생겨 폭이 바뀌면 한 번 더
+  }
+  return true;
 }
+// 칸을 그린 뒤: 배치하고, ar이 없던 사진은 로드되면 다시 배치한다. 배치가 끝날 때마다 onLaid (결과 화면은 칸 크기 재기)
+function masonry(box, onLaid){
+  box._onLaid = onLaid || null;
+  layoutMasonry(box); if (onLaid) onLaid();
+  let t = null;
+  $$('.g-item', box).forEach(tl => {
+    const id = tl.dataset.id, p = photoById(id); if (p && p.ar > 0) return;
+    const img = tl.querySelector('img'), fix = () => {
+      if (!img.naturalWidth || !img.naturalHeight) return;
+      const r = img.naturalWidth / img.naturalHeight; if (Math.abs(r - arOf(id)) < .01) return;
+      AR[id] = r; clearTimeout(t); t = setTimeout(() => { if (layoutMasonry(box) && box._onLaid) box._onLaid(); }, 60);
+    };
+    img.complete ? fix() : img.addEventListener('load', fix);
+  });
+}
+// 창 크기가 바뀌면 다시 배치하고 칸 크기를 다시 잰다 (잠깐 모아서 한 번)
+let relayTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(relayTimer);
+  relayTimer = setTimeout(() => {
+    $$('.g-grid').forEach(box => { if (layoutMasonry(box) && box._onLaid) box._onLaid(); });
+    const m = $('.modal .pv'); if (m && m._fit) m._fit();
+  }, 120);
+});
 function bindLikeButtons(root){ $$('[data-like]', root).forEach(b => b.onclick = e => { e.stopPropagation(); toggleLike(b.dataset.like); if (P.view === 'saved') renderSearchUI(); }); }
 // 검색 실행 (같은 검색어·시드면 늘 같은 결과라 새로고침 뒤에도 그대로 복원된다)
 function doSearch(q){ const r = runSearch(q, 'pilot'); S.lastQuery = q; S.results = r.list; S.resultMeta = {hits: r.hits, padded: r.padded}; return r; }
@@ -832,13 +925,13 @@ function renderSearchUI(){
   if (!S.lastQuery){
     $('#main').innerHTML = `<div class="g-bar g-bar-home">${savedBtn()}</div><div class="g-home">
       <p class="g-task">${esc(TASK_LINE)}</p>
-      <form class="g-form" id="gform" role="search"><input type="search" id="q" aria-label="검색어" autocomplete="off"><button class="g-btn">검색</button></form></div>`;
+      ${searchForm('')}</div>`;
   } else {
-    $('#main').innerHTML = `<div class="g-top">
-      <form class="g-form" id="gform" role="search"><input type="search" id="q" aria-label="검색어" autocomplete="off" value="${esc(S.lastQuery)}"><button class="g-btn">검색</button></form>${savedBtn()}
-      <p class="g-task sm">${esc(TASK_LINE)}</p></div>
+    $('#main').innerHTML = `<header class="g-top">
+      ${searchForm(S.lastQuery)}${savedBtn()}
+      <p class="g-task sm">${esc(TASK_LINE)}</p></header>
       <div class="g-grid" id="results"></div>
-      <div class="row" style="justify-content:center;margin-top:20px"><button class="btn" id="more" hidden>결과 더 보기</button></div>`;
+      <div class="g-more"><button class="btn lg" id="more" type="button" hidden>결과 더 보기</button></div>`;
     $('#more').onclick = () => { const before = Math.min(S.resultLimit, S.results.length); S.resultLimit += 30; P.resultLimit = S.resultLimit; savePick(); drawResults('more', before); };
     drawResults(source);
   }
@@ -855,31 +948,32 @@ function renderSearchUI(){
 function drawResults(source, before){
   const box = $('#results'); if (!box) return;
   const shown = S.results.slice(0, S.resultLimit);
-  if (!shown.length){ box.innerHTML = '<p class="muted" style="padding:40px 0;grid-column:1/-1">검색 결과가 없습니다.</p>'; $('#more').hidden = true; return; }
-  box.innerHTML = shown.map((p, i) => tile(p, 'search', i + 1)).join('') + '<span class="g-fill"></span>';
+  if (!shown.length){ box.style.height = ''; box.innerHTML = '<p class="g-none">검색 결과가 없습니다.</p>'; $('#more').hidden = true; return; }
+  box.innerHTML = shown.map((p, i) => tile(p, 'search', i + 1)).join('');
   // 노출 기록: 결과 더 보기면 새로 붙은 사진만, 그 밖에는 그린 사진 전부를 한 묶음으로
   if (source === 'more'){ const e = logShow('more', shown.slice(before), before + 1); if (e) e.ids.forEach(id => S.owner[id] = e.n); }
   else { const e = logShow(source, shown, 1); S.owner = {}; if (e) e.ids.forEach(id => S.owner[id] = e.n); }
   bindLikeButtons(box);
   $$('.g-item', box).forEach(t => t.querySelector('.g-open').onclick = () => openPreview(t.dataset.id, shown, false, 'click'));
   $('#more').hidden = S.results.length <= S.resultLimit;
-  fitTiles(box, () => measureTiles(box));
+  // 칸 배치(사진 비율로 높이를 미리 정함) → 바로 칸 크기 재기. 다시 배치될 때(창 크기·비율 보정)마다 다시 잰다
+  masonry(box, () => measureTiles(box));
   observeTiles(box);
 }
 
 function renderSavedUI(){
   const list = P.liked.map(photoById).filter(Boolean);
   if (P._sel && !P.liked.includes(P._sel)) P._sel = null;
-  $('#main').innerHTML = `<div class="g-top">
+  $('#main').innerHTML = `<header class="g-head">
       <button class="btn" id="back" type="button">← 검색으로 돌아가기</button>
-      <h1 class="g-title">마음에 든 사진 <span class="mono">${list.length}</span></h1></div>
+      <h1 class="g-title">마음에 든 사진 <b>${list.length}</b></h1></header>
     ${list.length ? `<p class="muted g-guide">이 중에서 다음에 혼자 지낼 방으로 가장 마음에 드는 사진 한 장을 골라 주세요. 하트를 누르면 목록에서 빠져요.</p>
-      <div class="g-grid g-pick" id="saved">${list.map(p => tile(p, 'pick')).join('')}<span class="g-fill"></span></div>
+      <div class="g-grid g-pick" id="saved">${list.map(p => tile(p, 'pick')).join('')}</div>
       <div class="g-decide"><span class="muted" id="sel-hint">${P._sel ? '고른 사진: 1장' : '사진을 눌러 한 장을 고르세요'}</span><button class="g-btn" id="decide" type="button" ${P._sel ? '' : 'disabled'}>이 사진으로 결정</button></div>`
     : `<div class="empty">아직 담은 사진이 없어요.<br>검색 결과에서 하트를 눌러 마음에 드는 사진을 담아 보세요.</div>`}`;
   $('#back').onclick = () => { P.view = 'search'; savePick(); S.nextSource = 'return'; renderSearchUI(); };
   const box = $('#saved'); if (!box) return;
-  fitTiles(box); bindLikeButtons(box);
+  masonry(box); bindLikeButtons(box);
   $$('.g-item', box).forEach(t => {
     t.querySelector('.g-open').onclick = () => { P._sel = t.dataset.id; savePick(); $$('.g-item', box).forEach(x => x.classList.toggle('sel', x === t)); $('#decide').disabled = false; $('#sel-hint').textContent = '고른 사진: 1장'; };
   });
@@ -889,13 +983,21 @@ function renderSavedUI(){
 function confirmFinal(){
   const p = photoById(P._sel); if (!p) return;
   const m = document.createElement('div'); m.className = 'modal';
-  m.innerHTML = `<div class="panel g-confirm" role="dialog" aria-modal="true" aria-label="최종 선택 확인">
-    <div class="row between"><div><h2>이 사진으로 결정할까요?</h2><p class="muted">결정하면 다시 바꿀 수 없어요.</p></div>
-    <div class="row"><button class="btn" data-close type="button">다시 고르기</button><button class="g-btn" id="ok" type="button">결정</button></div></div>
+  m.innerHTML = `<div class="panel g-confirm g-cf" role="dialog" aria-modal="true" aria-label="최종 선택 확인">
+    <div class="row between"><div class="stack" style="gap:4px"><h2>이 사진으로 결정할까요?</h2><p class="muted">결정하면 다시 바꿀 수 없어요.</p></div>
+    <div class="row"><button class="btn lg" data-close type="button">다시 고르기</button><button class="g-btn" id="ok" type="button" style="min-height:48px">결정</button></div></div>
     <img alt="고른 사진" src="${urlFor(p,'full')}"></div>`;
-  m.onclick = e => { if (e.target === m || e.target.dataset.close != null) m.remove(); };
+  m.onclick = e => { if (e.target === m || e.target.closest('[data-close]')) m.remove(); };
   $('#ok', m).onclick = () => { P.final = p.id; P.finishedAt = nowIso(); archiveCurrent('완료'); savePick(); m.remove(); renderSearchUI(); window.scrollTo(0,0); };
   document.body.appendChild(m);
+  // 사진 크기를 비율로 정해 카드가 사진 폭에 맞게 줄어들게 (세로 사진 옆 빈 공간 없음)
+  const panel = $('.g-cf', m), img = $('img', panel), head = panel.firstElementChild, cs = getComputedStyle(panel), padX = parseFloat(cs.paddingLeft) * 2, padY = parseFloat(cs.paddingTop) * 2, mp = parseFloat(getComputedStyle(m).paddingTop) * 2;
+  const ar = arOf(p.id), aw = Math.min(window.innerWidth - mp - padX, 1000);
+  for (let k = 0; k < 2; k++){ // 카드 폭이 바뀌면 제목 줄 높이도 바뀌므로 한 번 더
+    const ah = window.innerHeight - mp - padY - head.offsetHeight - 14;
+    let w = aw, h = w / ar; if (h > ah){ h = ah; w = h * ar; }
+    img.style.width = Math.floor(w) + 'px'; img.style.height = Math.floor(h) + 'px';
+  }
 }
 function renderDoneUI(){
   const p = photoById(P.final);
@@ -913,7 +1015,7 @@ function renderStartUI(){
     <h2>참여자 시작</h2>
     <label class="small muted" for="who-in">진행자</label><input type="text" id="who-in" value="${esc(LS.get(WHO_KEY, ''))}" placeholder="예: 의현" autocomplete="off">
     <label class="small muted" for="pid-in">참여자 ID</label><input type="text" id="pid-in" placeholder="예: P03" autocomplete="off" required>
-    <div class="row" style="justify-content:flex-end"><button class="g-btn" type="submit">시작</button></div></form></div>`;
+    <div class="row" style="justify-content:flex-end"><button class="g-btn" type="submit" style="min-height:48px;padding:0 28px">시작</button></div></form></div>`;
   const inp = $('#pid-in'); inp.focus();
   $('#start-form').onsubmit = e => {
     e.preventDefault(); const id = inp.value.trim(); if (!id){ inp.focus(); return; }
@@ -922,28 +1024,44 @@ function renderStartUI(){
   };
 }
 
-// 크게 보기: 버튼 줄이 위, 사진은 화면 안에 원본 전체가 보이게. 열린 시간(dwellMs)과 화살표·버튼 이동을 기록한다
+// 크게 보기: 넓은 화면은 사진 왼쪽 + 오른쪽 버튼 열, 좁은 화면은 버튼 줄이 사진 위. 사진은 원본 전체가 화면 안에 들어오게 (sizePreview)
+// 열린 시간(dwellMs)과 화살표·버튼 이동을 기록한다
+function sizePreview(panel, ar){
+  const img = $('.pv-img', panel), side = $('.pv-side', panel); if (!img || !side) return;
+  const vw = window.innerWidth, vh = window.innerHeight, mob = vw < 768;
+  const pad = mob ? 8 : 24, inner = mob ? 10 : 16, gap = mob ? 10 : 24;
+  const aw = vw - 2 * pad - 2 * inner - (mob ? 0 : side.offsetWidth + gap);
+  const ah = vh - 2 * pad - 2 * inner - (mob ? side.offsetHeight + gap : 0);
+  let w = Math.min(aw, mob ? aw : 1100), h = w / ar; if (h > ah){ h = ah; w = h * ar; }
+  img.style.width = Math.max(1, Math.floor(w)) + 'px'; img.style.height = Math.max(1, Math.floor(h)) + 'px';
+}
 function openPreview(id, list, fromSaved, via){
   const p = photoById(id); if (!p) return;
   const i = list.findIndex(x => x.id === id);
   pvOpen(id, via || 'click', fromSaved ? 'saved' : 'search', i + 1);
   const m = document.createElement('div'); m.className = 'modal';
   m.innerHTML = `<div class="panel pv" role="dialog" aria-modal="true" aria-label="이미지 크게 보기">
-    <div class="row between pv-bar"><div class="row"><button class="btn sm" data-nav="-1" ${i <= 0 ? 'disabled' : ''}>← 이전</button><button class="btn sm" data-nav="1" ${i >= list.length - 1 ? 'disabled' : ''}>다음 →</button></div>
-    <div class="row"><button class="btn" data-close type="button">닫기</button>${fromSaved ? `<button class="g-btn" id="pick-this" type="button">이 사진 고르기</button>` : `<button class="g-like-btn${isLiked(id) ? ' on' : ''}" type="button" data-like="${id}" aria-pressed="${isLiked(id)}">${HEART}<span data-like-label="${id}">${isLiked(id) ? '마음에 든 사진에 담김' : '마음에 들어요'}</span></button>`}</div></div>
-    <img alt="방 사진" src="${urlFor(p,'full')}"></div>`;
+    <div class="pv-side">
+      <button class="btn" data-close type="button">닫기</button>
+      <div class="pv-act">${fromSaved ? `<button class="g-btn" id="pick-this" type="button" style="min-height:48px">이 사진 고르기</button>` : `<button class="g-like-btn${isLiked(id) ? ' on' : ''}" type="button" data-like="${id}" aria-pressed="${isLiked(id)}" aria-label="${isLiked(id) ? '마음에 든 사진에서 빼기' : '마음에 든 사진에 담기'}">${heart(20)}<span data-like-label="${id}">${likeText(id)}</span></button>`}</div>
+      <div class="pv-nav"><button class="btn" type="button" data-nav="-1" ${i <= 0 ? 'disabled' : ''}>← 이전</button><button class="btn" type="button" data-nav="1" ${i >= list.length - 1 ? 'disabled' : ''}>다음 →</button></div>
+    </div>
+    <img class="pv-img" alt="방 사진" src="${urlFor(p,'full')}"></div>`;
   const close = () => { pvClose(); m.remove(); document.removeEventListener('keydown', onKey); };
   const go = (d, how) => { const n = list[i + d]; if (n){ close(); openPreview(n.id, list, fromSaved, how); } };
   const onKey = e => { if (e.key === 'Escape') close(); if (e.key === 'ArrowRight') go(1, 'key'); if (e.key === 'ArrowLeft') go(-1, 'key'); };
-  m.onclick = e => { if (e.target === m || e.target.dataset.close != null) close(); };
+  m.onclick = e => { if (e.target === m || e.target.closest('[data-close]')) close(); };
   $$('[data-nav]', m).forEach(b => b.onclick = () => go(Number(b.dataset.nav), 'button'));
   $$('[data-like]', m).forEach(b => b.onclick = () => toggleLike(id));
   const pk = $('#pick-this', m); if (pk) pk.onclick = () => { P._sel = id; savePick(); close(); renderSearchUI(); };
   document.addEventListener('keydown', onKey);
   document.body.appendChild(m);
-  // 크게 보기에서 실제로 그린 사진 크기도 남긴다
-  const img = $('.pv>img', m), idx = S.pvIdx, size = () => { const e = (P.previews || [])[idx]; if (!e || !img.isConnected) return; const r = img.getBoundingClientRect(); Object.assign(e, {w: Math.round(r.width), h: Math.round(r.height), vw: window.innerWidth, vh: window.innerHeight}); savePickSoon(); };
-  img.complete ? size() : img.addEventListener('load', size);
+  // 사진 크기를 비율로 먼저 정해 두고(받는 동안 움직이지 않게), 실제로 그린 크기를 기록에 남긴다. 창 크기가 바뀌면 다시 맞춘다
+  const panel = $('.pv', m), img = $('.pv-img', m), idx = S.pvIdx;
+  const size = () => { const e = (P.previews || [])[idx]; if (!e || !img.isConnected) return; const r = img.getBoundingClientRect(); Object.assign(e, {w: Math.round(r.width), h: Math.round(r.height), vw: window.innerWidth, vh: window.innerHeight}); savePickSoon(); };
+  panel._fit = () => { sizePreview(panel, arOf(id)); size(); };
+  panel._fit();
+  if (!(p.ar > 0)) img.addEventListener('load', () => { if (img.naturalWidth){ AR[id] = img.naturalWidth / img.naturalHeight; panel._fit(); } });
 }
 
 /* 연구자 화면: 최근 참여자 결과 */
