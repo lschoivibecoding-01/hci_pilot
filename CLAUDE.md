@@ -5,8 +5,9 @@
 ## 파일
 
 - `search_system.html` 하나. 빌드 없음.
-- `tests/query_eval.csv` + `tests/query_eval.js` (2026-10-27.6): 검색어 평가 묶음(검색어 339개, 기대 태그, 메모)과 실행기. `node tests/query_eval.js [예전.html]`로 1건 이상 비율·기대 태그 맞음 비율·0건 목록을 보고, 예전 파일을 주면 시작 단어 8개의 결과 목록이 같은지도 본다. **SYN·ROOM_WORDS·SKIP_WORDS·tokenize를 고치면 돌린다.** 뒤쪽 60개("나중 추가")는 사전을 고친 뒤에 따로 만든 확인용이다.
-- `pool/pool.csv` + `pool/photos/*.jpg`: 기본 사진 풀(200장). http(s)로 열면(GitHub Pages 등) 페이지가 시작할 때 `syncDefaultPool()`로 이 브라우저의 IndexedDB에 맞춰 넣는다. 파일로 열면(file://) 브라우저가 막아서 건너뛰고, 그때는 `풀 불러오기`(ZIP)로 넣는다. 로컬 확인은 `python -m http.server`로 띄워서 한다.
+- `tests/query_eval.csv` + `tests/query_eval.js` (2026-10-27.6, .7에 넓힘): 검색어 평가 묶음(검색어 409개, 기대 태그, 메모)과 실행기. `node tests/query_eval.js [예전.html]`로 묶음별(기본 / "나중 추가" / "설명 추가") 1건 이상 비율·기대 맞음 비율·0건 목록을 보고, 예전 파일을 주면 시작 단어 8개 결과 목록이 같은지, 흔한 검색어 30개(`COMMON30`)와 평가 묶음 전체의 상위 24장 D 평균(0~5)이 0.3 넘게 움직였는지, 설명에만 맞은 사진의 D 평균도 본다. **SYN·ROOM_WORDS·SKIP_WORDS·tokenize·설명문 검색·pool.csv를 고치면 돌린다.** "나중 추가" 60개는 사전을 고친 뒤 따로 만든 확인용(손대지 않음), "설명 추가" 70개(2026-10-27.7)는 물건 검색어. expected_tags `@` = 태그에는 없지만 설명문에 있어 1건 이상 나와야 함, 빈칸 = 풀에 없음(0건이 맞음). pool.csv는 따옴표 CSV로 읽는다(caption에 쉼표).
+- `pool/pool.csv` + `pool/photos/*.jpg`: 기본 사진 풀(200장). 열 `file, tags, contains, caption, objects`(앞 세 열 그대로, 2026-10-27.7에 뒤 두 열 추가). caption·objects는 room-pool 스킬의 `caption_guide.md` 규칙으로 Claude가 쓴 설명문·물건 목록(D 요소를 다른 물건과 같은 무게로). http(s)로 열면(GitHub Pages 등) 페이지가 시작할 때 `syncDefaultPool()`로 이 브라우저의 IndexedDB에 맞춰 넣는다. 파일로 열면(file://) 브라우저가 막아서 건너뛰고, 그때는 `풀 불러오기`(ZIP)로 넣는다. 로컬 확인은 `python -m http.server`로 띄워서 한다.
+- `pool/pool_flags.csv` (2026-10-27.7): `file, flags, note` — 설명문을 쓰며 모델이 단 확인 표시(`watermark:…`·`render_suspect`·`ai_suspect`·`low_quality`)와 메모(89줄, 표시 있는 사진 59장). **추정이라 사람 확인 필요.** 연구자 화면 사진 풀 관리에서만 `loadPoolFlags()`로 읽어 `S.flags`(메모리, IndexedDB에 안 넣음)에 두고 사진 칸 오른쪽 위 배지 `확인 · 렌더 의심`(호박색 테두리, title에 메모), 보기 `확인 표시 있는 사진`, 편집 칸 상자로 보인다. `?view=search`는 읽지 않는다. 검토용 표와 보고서는 저장소 밖 `1027_prep/pool_review/`(`1027_pool_review.md`, `flagged.csv`).
 - 맨 위에 반드시 `<!doctype html>`, `<html lang="ko">`, `<meta charset="utf-8">`가 있어야 한다(없으면 로컬에서 열 때 한글이 깨진다).
 - 외부 의존성은 JSZip(cdnjs, ZIP 내보내기·불러오기)과 글꼴 Pretendard(jsDelivr, `pretendardvariable-dynamic-subset`)뿐이다. 둘 다 없어도 핵심 기능은 동작한다(글꼴은 Apple SD Gothic Neo / Malgun Gothic으로 대체). 숫자는 고정폭 글꼴 대신 본문 글꼴의 `tabular-nums`(`--f-mono`가 본문 글꼴을 가리킴).
 
@@ -29,7 +30,7 @@
 
 1. **연구자 화면** (기본)
    - 오른쪽 위 `새 참여자 시작` → 참여자 ID 입력 모달(비우면 진행 안 됨) → 검색 화면. 진행 중인 참여자가 있으면 `P03 이어서 진행` 버튼도 나온다.
-   - 탭 `사진 풀 관리`: `기본 풀 다시 맞추기`(http(s)일 때만 보임, 직접 고친 태그를 덮어씀), 사진 추가(드래그/파일/폴더, `pool.csv`를 함께 넣으면 태그 자동 적용), 태그 편집(Ctrl/⌘·Shift 다중 선택), 선택·전체 삭제(두 번 눌러야 삭제, Delete 키 지원), 풀 내보내기·불러오기(ZIP: `pool.csv` + `photos/*.jpg`). `pool.csv` 열은 `file, tags, contains`이고 tags는 `;`로 구분한다.
+   - 탭 `사진 풀 관리`: `기본 풀 다시 맞추기`(http(s)일 때만 보임, 직접 고친 태그를 덮어씀), 사진 추가(드래그/파일/폴더, `pool.csv`를 함께 넣으면 태그 자동 적용), 태그 편집(Ctrl/⌘·Shift 다중 선택), 선택·전체 삭제(두 번 눌러야 삭제, Delete 키 지원), 풀 내보내기·불러오기(ZIP: `pool.csv` + `photos/*.jpg`). `pool.csv` 열은 `file, tags, contains, caption, objects`(뒤 두 열은 2026-10-27.7부터, 없어도 됨)이고 tags·objects는 `;`로 구분한다. 사진 칸 오른쪽 위 `확인 · …` 배지와 보기 `확인 표시 있는 사진`은 `pool/pool_flags.csv`(아래), 사진 하나를 고르면 편집 칸에 설명문·물건 목록이 보인다.
    - 탭 `참여자 기록`: 참여자별 카드(ID 수정 가능, 완료/미완료, 검색어 목록(맞은 사진 수·채움 여부), 노출 요약, 앱·풀 버전, 담은 사진과 각각을 담은 검색, 최종 사진, 다른 PC에서 불러온 기록은 "불러온 기록" 표시), 진행자가 둘 이상이면 진행자별 보기(`S.archWho`), `기록 불러오기 (ZIP)`(`importArchive`: ZIP 안 `participants.json`을 읽어 `id`+`researcher`가 같은 기록은 건너뛰고 `imported: true`로 합침), `기록 + 최종 사진 (ZIP)`(화면에 보이는 기록만: `participants.csv` + `participants.json` + `impressions.csv` + `진행자_순번_ID/` 사진 폴더). CSV 단독 내보내기 버튼은 없앴다(ZIP 안에 있음).
 2. **참여자 검색 화면** (구글 이미지 검색처럼 검색창만 있음)
    - 과제 안내 한 줄 `TASK_LINE` = "다음에 혼자 지낼 방으로 가장 마음에 드는 사진을 한 장 골라 주세요. 마음에 드는 사진은 하트를 눌러 담아 두세요."(2026-10-27.5). 홈에서는 검색창 위(17px), 결과 화면에서는 위 검색창 아래(14px, 좁은 화면 13.5px, 머리 전체 폭) 흐린 글자(`--muted`, 대비 4.5:1 이상)로 늘 보인다. 두 문장을 `<span>`으로 나눠(`taskHTML`) 한 줄에 안 들어가면 문장 단위로 줄을 바꾼다. placeholder는 넣지 않는다.
@@ -51,7 +52,7 @@
 
 | 저장소 | 키 | 내용 |
 | --- | --- | --- |
-| IndexedDB | DB `room-search-pool`, store `photos` | 사진 레코드 `{id, name, tags[], contains[], blob, thumb, addedAt, fromPool?, ar?}`. blob은 긴 변 1600px JPEG, thumb은 420px. `ar`(가로/세로 비율, 소수 4자리)은 `ensureAspect()`가 시작할 때·사진 추가 뒤 blob에서 재서 없는 사진에만 채운다. 기본 풀 사진은 `fromPool: true`, id는 `pool_` + 파일 이름 해시라 다시 맞춰도 기록의 사진 참조가 유지된다 |
+| IndexedDB | DB `room-search-pool`, store `photos` | 사진 레코드 `{id, name, tags[], contains[], caption?, objects[]?, blob, thumb, addedAt, fromPool?, ar?}`. `caption`·`objects`(2026-10-27.7)는 `syncDefaultPool`·`addFiles`(pool.csv 함께)가 채우고 `exportPool`이 내보낸다. 예전 레코드엔 없고 없으면 설명문 검색만 안 걸린다. blob은 긴 변 1600px JPEG, thumb은 420px. `ar`(가로/세로 비율, 소수 4자리)은 `ensureAspect()`가 시작할 때·사진 추가 뒤 blob에서 재서 없는 사진에만 채운다. 기본 풀 사진은 `fromPool: true`, id는 `pool_` + 파일 이름 해시라 다시 맞춰도 기록의 사진 참조가 유지된다 |
 | localStorage | `rs_pool_ver` | 마지막으로 맞춘 `pool/pool.csv`의 해시. 바뀌면 다음 시작 때 태그를 갱신하고 새 사진을 받고, 빠진 기본 풀 사진은 지운다(연구자가 직접 넣은 사진은 그대로) |
 | localStorage | `rs_pick` | 진행 중 참여자 `P`: `{pid, liked[], final, view, active, _sel, sessionAt, startedAt, finishedAt, queries[], likeLog[], shows[], previews[], lastQ, resultLimit, archivedId}`. `sessionAt`은 시작 버튼을 누른 때. `shows`·`previews`는 아래 노출 기록 |
 | localStorage | `rs_archive` | 참여자 기록 배열 `ARCH`. 고치기 전에 `reloadArch()`로 다른 창의 최신 기록부터 읽는다 |
@@ -63,7 +64,7 @@
 
 `contains`는 사진에 보이는 타깃 요소(식물·러그·스탠드 조명·벽 그림·겹친 침구·담요)를 **보이면 다** 적은 표시로, 나중에 요소 포함 비율을 맞추는 데 쓴다. 타깃 요소는 태그(`식물·러그·액자·스탠드·담요`)로도 달려 검색되고, room-pool 스킬의 `build_pool.py`가 이 태그에서 `contains`를 자동으로 채운다. 검색에서 빼지는 않는다(`isExcluded = () => false`). 2026-10-27에 다섯째 요소를 `따뜻한 조명`에서 `겹친 침구·담요`로 바꿨다: `따뜻한조명` 태그는 일반 조명 태그로 남아 있고, `담요`는 침대 이불 위에 담요·스로우·베드러너(호텔식 보조 이불)를 한 겹 더 얹거나 접어 둔 사진에만 단다(소파에 걸친 담요, 쿠션만 있는 것은 제외). `TARGETS`의 `warm` 항목은 예전 contains가 남은 사진 때문에 지우지 않았다.
 
-앱 버전 `APP_VERSION`(날짜 + 순번, 지금 `2026-10-27.6` = 동의어 사전 넓힘·뜻 없는 말 빼기·0장 제안 화면·`zero_hit_queries`. `.5` = 시작 단어·담기 낱말·구분 줄·모아 보기 빼기/되돌리기·다음 참여자 받기. `.4` = 구글 시트 연결)을 기록마다 붙인다. 화면이나 기록 방식을 바꾸면 올린다.
+앱 버전 `APP_VERSION`(날짜 + 순번, 지금 `2026-10-27.7` = 사진 설명문 검색(caption·objects)·`queries[].capHits`·연구자 확인 표시. `.6` = 동의어 사전 넓힘·뜻 없는 말 빼기·0장 제안 화면·`zero_hit_queries`. `.5` = 시작 단어·담기 낱말·구분 줄·모아 보기 빼기/되돌리기·다음 참여자 받기. `.4` = 구글 시트 연결)을 기록마다 붙인다. 화면이나 기록 방식을 바꾸면 올린다.
 
 ### 노출 기록 (2026-10-27.2부터)
 
@@ -94,6 +95,7 @@
 }
 ```
 
+- 2026-10-27.7부터 `queries[].capHits`: 맞은 사진(`hits`, 전체) 중 설명문에만 맞은 사진 수. `hits`는 여전히 전체 맞은 수. CSV·시트·`impressions.csv`는 바뀌지 않았다(`is_match`는 설명에만 맞은 사진도 1).
 - `queries[]`에는 2026-10-27.2부터 `hits`(맞은 사진 수), `padded`(나머지로 채웠는지)도 붙는다. 2026-10-27.5부터 `via`: `typed`(검색창) | `chip`(시작 단어). 2026-10-27.6부터 `via: 'suggest'`(0장 제안 화면의 제안 단어), `broad: true`(방 낱말·뜻 없는 말·빼기뿐이라 모든 사진이 맞은 검색, 있을 때만). 2026-10-27.6부터 `hits: 0`이면 `padded: false`(채우지 않음). 예전 기록은 없음.
 - `appVersion`부터 아래 필드는 새 기록에만 있다. 예전 기록(필드 없음)도 그대로 불러오고 화면·CSV에서는 빈칸/"이전 버전 기록"으로 나온다. 고칠 때 이 호환을 깨지 않는다.
 - `sheet`(2026-10-27.4부터, 선택): 시트 보내기 상태 `{state: 'pending'|'sending'|'sent'|'failed', at, error, code, tries, next, by, until, rows}`. 기록을 만들 때 시트 주소가 있을 때만 붙는다. 없는 기록(예전 기록, 주소 없이 만든 기록)은 자동으로 보내지 않고 손으로 보낼 때만 간다.
@@ -131,12 +133,14 @@
 
 - `runSearch(q, seed)`: 검색어를 토큰으로 나누고(조사 떼기, `-단어`·"○○ 없는/빼고"는 제외어), 사진 태그와 동의어 사전 `SYN`에 맞는 개수로 점수를 매긴다. 동점은 시드 해시로 섞는다. 일치가 1~11장이면 나머지 사진으로 24장까지 채우고, **0장이면 채우지 않는다**(2026-10-27.6, 제안 화면). 태그·동의어가 검색어를 품으면 1점, 검색어가 태그·동의어를 품기만 하면 0.5점(턴테이블 → 테이블)이다. 한 글자 검색어(책·꽃·옷 등)는 태그·동의어와 똑같을 때만 걸린다. `ROOM_WORDS`(방·침실·원룸·자취방·침대·벽·천장·공간·인테리어·사진·가구·자취·방꾸미기 등)와 `SKIP_WORDS`(감성·예쁜·좋은·느낌·분위기·스타일·디자인·같은·있는·많은 등 어느 태그도 가리키지 않는 말, 2026-10-27.6)는 점수에서 빼고, `N평`은 10평 이하면 `좁은`으로 읽고, 끝의 `톤·색·처럼·랑·만·하게·감성·풍·방·인테리어` 등은 떼어 읽는다(베이지톤 → 베이지, 소파랑 → 소파, 북유럽감성 → 북유럽, 일본풍 → 일본). 떼고 남은 것이 방 낱말·뜻 없는 말이면 그 토큰은 버린다(자취방감성, 원룸인테리어). **남은 토큰이 없으면**(원룸 인테리어, 예쁜 방, 20평, 러그 없는 방) 빼지 않은 사진이 모두 맞는 사진이다(`broad`, 시드 순서).
 - `SYN` (2026-10-27.6에 369 → 681개로 넓힘): 외래어와 표기 변형(메탈·메탈릭·스테인리스·크롬·골드·황동 → 금속, 내츄럴·네추럴, 스칸디·노르딕, 미드센츄리, 앤티크·엔틱, 쇼파 …), 색 이웃(오트밀·크림톤 → 베이지, 차콜 → 그레이, 올리브·카키·세이지 → 그린, 흑백·모노톤 → 블랙·화이트(·그레이)), 소재 이웃(린넨·벨벳·부클 → 패브릭, 마블 → 대리석, 월넛·오크 → 우드), 흔한 말(코지·편안한 → 아늑한, 홈오피스·데스크 → 책상, 냥이 → 고양이). **넣는 규칙**: (1) 그 태그를 가리키는 말만(정확도 우선). 예쁜·감성 같은 말은 태그로 보내지 않고 `SKIP_WORDS`에 둔다. (2) 검색어가 동의어 안에 들어 있기만 해도 걸리므로, 시작 단어와 그 어간(모던·따뜻·베이지·우드·햇살·고급스러운·그레이/그레·넓은)을 품은 말은 다른 태그에 넣지 않는다(시작 단어 결과가 바뀜). 다른 흔한 검색어를 품는 합성어도 넣지 않는다(예: `카페트`는 "카페 같은 방"이 러그에 걸려서, `테이블램프`는 "테이블"이 스탠드에 걸려서, `생기있는`은 "…있는 방"이 걸려서 뺐다). (3) 고친 뒤 `node tests/query_eval.js <예전.html>`로 시작 단어 8개 결과 목록이 같은지 본다. 2026-10-27.6에 뺀 동의어: 따뜻한조명의 `조명`(조명이 든 모든 검색이 따뜻한조명에만 0.5점씩 걸림. "조명" 검색은 태그 이름으로 모든 조명에 그대로 걸림), 담요의 `호텔침구`("호텔" 검색에 담요 사진 36장이 더 걸림), 액자의 `패브릭포스터`("패브릭" 검색에 액자 사진 122장이 걸림), 내추럴의 `자연`("자연광"이 내추럴에 걸림).
+- **설명문 보조 검색** (2026-10-27.7, `capIndex`·`capScore`·`capObj`, `CAP_OBJ` 0.4 / `CAP_TEXT` 0.25): 태그가 1순위다. 검색어 토큰이 **풀의 어느 사진 태그·동의어에도 안 걸릴 때만**(어휘 빈칸: 빈백·에어컨·노트북·벤치 …) 그 토큰을 물건 목록(`objects`) → 설명문(`caption`) 순으로 찾는다. 물건 이름(띄어 쓴 낱말 각각 + 붙여 쓴 전체, "전신거울" → "전신 거울")이나 설명문 낱말이 토큰으로 **시작**할 때만 맞음(낱말 중간은 안 봄: "요가" → "담요가", "자가" → "의자가" 방지), 두 글자 이상만. 정렬은 (태그 점수, 설명 점수, 시드)라 태그에 맞은 사진이 늘 먼저이고 설명에만 맞은 사진은 뒤에 붙는다. `runSearch`가 `capHits`를 돌려준다. 처음엔 사진마다(그 사진 태그에 안 걸리면) 설명을 봤으나 시작 단어 `베이지`(+11장)·`넓은`(+1장) 결과 목록이 바뀌어서 "풀 전체에서 태그에 안 걸리는 토큰만"으로 좁혔다 → 태그 낱말로만 된 검색은 결과 목록이 예전과 **똑같다**. 빼기(`없는`/`-`)는 태그 + 물건 목록 둘 다 본다(설명문은 안 봄). 확인(2026-10-27.7): 시작 단어 8개 목록 같음, 흔한 검색어 30개 상위 24장 D 평균 3.058 → 3.058, 평가 묶음 전체에서 0.3 넘게 움직인 검색어 0개, 설명에만 맞은 사진 D 평균 2.92(검색어별)/2.98(서로 다른 170장) vs 풀 2.98.
 - 남은 알려진 겹침(태그 이름 자체라 사전으로 못 고침): "따뜻한" → 따뜻한조명(시작 단어라 그대로 둠), "테이블" ↔ 턴테이블, "수납" → 수납장·수납침대, "노란색" → 따뜻한조명(`노란조명`), "나무" → 라탄(`등나무`), "무드등" → 어두운(`무드`).
 - 태그 어휘는 `TAG_GROUPS`(분위기, 스타일, 색, 빛·시간대, 소재·질감, 패턴, 가구, 침대, 조명, 소품·장식, 생활감, 공간·전망, 반려동물 — 95개)에 있고, `.claude/skills/room-pool/vocab.json`과 같게 유지한다. 방 종류(침실·원룸 등)는 일부러 태그로 달지 않는다: 그런 검색어로 결과가 걸러지지 않게 하려는 것이다.
 
 ## 주요 함수
 
-- 연구자: `render`, `renderPool`, `drawGrid`, `drawEditor`, `addFiles`, `exportPool`, `importPool`, `confirmDelete`, `askParticipantId`, `renderArchive`, `zeroHitHTML`/`zeroHitQs`, `archiveCSV`, `exportArchiveZip`
+- 검색: `tokenize`, `runSearch`, `searchIndex`, 설명문 `capIndex`/`capScore`/`capObj`, `suggestFor`
+- 연구자: `render`, `renderPool`, `loadPoolFlags`/`flagOf`/`flagText`(확인 표시), `drawGrid`, `drawEditor`, `addFiles`, `exportPool`, `importPool`, `confirmDelete`, `askParticipantId`, `renderArchive`, `zeroHitHTML`/`zeroHitQs`, `archiveCSV`, `exportArchiveZip`
 - 연구자(진행 표시): `renderTopRight`(다음 참여자 받기 포함), `updateLive`(1초마다 숫자 칸), 기록 요약 `impStats`, 노출 CSV `impressionsCSV`
 - 참여자: `renderSearchUI`, `submitQuery(q, via)`, `doSearch`, `drawResults(source, before)`, `drawNoMatch`(0장 제안 화면)·`suggestFor(q)`, `layoutMasonry`/`masonry`(칸 배치, `arOf`·`masonryCols`), `sizePreview`, `toggleLike`(likeLog 기록), `syncLikes`/`syncFinishBar`(아래 고정 줄), `renderSavedUI`, `removeSaved`/`undoToast`, `confirmFinal`, `renderDoneUI`, `nextParticipant`, `renderStartUI`, `openPreview(id, list, fromSaved, via)`, `restoreResults`
 - 노출 기록: `logShow`, `observeTiles`(IntersectionObserver), `measureTiles`, `pvOpen`/`pvClose`
@@ -157,5 +161,6 @@
 - [ ] 진행 대본(1026)은 "최소 4장", "연구자에게 알려 주세요."를 누른다고 되어 있다. 도구는 장수 제한이 없고, 참여자 화면에는 다음으로 넘기는 버튼이 없으며(연구자 창 `다음 참여자 받기`), 과제 문장이 "…사진을 한 장 골라 주세요"로 바뀌었으니 대본을 맞춰야 한다.
 - [ ] 시트 `검색 노출` 탭 `AL1`에 머리글 `query_via` 넣기 (사용자가 직접).
 - [ ] 시트 `검색 기록` 탭 `AD1`에 머리글 `zero_hit_queries` 넣기 (사용자가 직접).
+- [ ] **사진 풀 검토** (2026-10-27.7): `1027_prep/pool_review/flagged.csv`의 `keep_or_drop`을 사람이 채운다(모델 추정 59장: 렌더 의심 32·워터마크 15·AI 의심 14·저화질 2, spacejoy 12장 전부 포함). 빼면 141장 → 보고서 `1027_pool_review.md`의 권고대로 실사 사진 60~80장을 D 할당에 맞춰 더한다. 풀을 바꾸면 `rs_pool_ver`가 바뀌어 각 PC가 다시 맞춘다(실험 중에는 바꾸지 않는다).
 - [ ] 파일럿 중 "맞는 사진이 없던 검색어" 상자를 보고 어휘 빈칸은 `SYN`에, 풀에 없는 것(수영장·오션뷰·벽난로·피아노·캐노피·빈백·크리스마스·홈카페 등, 그리고 태그는 있지만 0장인 `복층`)은 사진 수집 계획에 넣는다. 평가 묶음에서 일부러 남긴 0건: 카페트(카페와 겹침), 원색·니트·코듀로이(나중 추가 확인용, 고치지 않음).
 - 시트 연결을 켜도 기록 원본은 브라우저 localStorage이고, 시트는 추가 사본이다. 그래서 여전히 세션마다 기록 ZIP으로 백업하도록 안내되어 있다. 연구자 3명이 각자 PC에서 진행하고(참여자 P01~P12를 미리 나눠 배정), 나중에 의현이 각자의 ZIP을 `기록 불러오기`로 한 화면에 합친다. 새 기록 번호(`no`)는 같은 진행자의 자기 기록만 보고 매긴다(불러온 기록 제외).

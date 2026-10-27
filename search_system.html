@@ -82,6 +82,9 @@ select{min-height:32px;padding:0 8px 0 12px;font-size:13px;cursor:pointer}
 .pitem .flag{position:absolute;left:8px;top:8px;font-size:11px;font-weight:700;border-radius:var(--pill);padding:2px 8px}
 .flag.ex{background:var(--danger);color:#fff}
 .flag.none{background:var(--research);color:#fff}
+.flag.chk{left:auto;right:8px;background:#fff;color:var(--body);border:1px solid var(--research);max-width:calc(100% - 16px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.capbox{font-size:12px;line-height:1.5;color:var(--body);background:var(--card);border-radius:var(--r);padding:8px 10px;word-break:keep-all}
+.capbox b{color:var(--muted);font-weight:600}
 .editor{position:sticky;top:16px;display:flex;flex-direction:column;gap:14px;max-height:calc(100vh - 32px);overflow:auto}
 .editor img{border-radius:var(--r)!important}
 .taggroup{display:flex;flex-direction:column;gap:6px}
@@ -449,7 +452,7 @@ const SYN = {
 };
 const MAX_EDGE = 1600, THUMB_EDGE = 420;
 // 앱 버전: 기록마다 붙는다. 화면·기록 방식을 바꾸면 날짜와 순번을 올린다
-const APP_VERSION = '2026-10-27.6';
+const APP_VERSION = '2026-10-27.7';
 // 참여자 화면의 과제 안내 한 줄 (검색 그룹 진행 대본의 과제 문장 + 하트 안내). 동작 이름은 "담기", 모은 사진은 "담은 사진"으로 통일
 const TASK_LINE = '다음에 혼자 지낼 방으로 가장 마음에 드는 사진을 한 장 골라 주세요. 마음에 드는 사진은 하트를 눌러 담아 두세요.';
 // 첫 화면 검색창 아래 시작 단어 (모든 참여자에게 같은 순서, 바꾸지 않는다).
@@ -514,6 +517,7 @@ function parseCSV(text){
 }
 const csvCell = v => { const s = Array.isArray(v) ? v.join(';') : String(v ?? ''); return /[",\n;]/.test(s) && !Array.isArray(v) ? `"${s.replace(/"/g,'""')}"` : (/[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s); };
 function hash(str){ let h = 2166136261; for (let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+const splitObjects = s => String(s || '').split(';').map(x => x.trim()).filter(Boolean);
 const targetIdsFrom = s => (s||'').split(/[;|,]/).map(x => x.trim()).filter(Boolean).map(x => { const t = TARGETS.find(t => t.id === x || t.name === x || norm(t.name) === norm(x)); return t ? t.id : null; }).filter(Boolean);
 
 /* 이미지 축소 저장 */
@@ -574,24 +578,47 @@ function tokenize(q){
   });
   return {pos:[...new Set(pos)], neg:[...new Set(neg)]};
 }
+// 사진 설명문(caption)·물건 목록(objects) 보조 색인 (2026-10-27.7). 태그가 1순위이고 이것은 2순위다.
+// 풀의 어느 사진 태그·동의어에도 안 걸리는 토큰에만 쓴다(아래 runSearch): 물건 이름 하나가 토큰으로 시작하면 CAP_OBJ, 아니면 설명문의 낱말 하나가 토큰으로 시작하면 CAP_TEXT.
+// "시작하면"만 본다(낱말 중간은 안 봄): "요가"가 "담요가"에, "자가"가 "의자가"에 걸리지 않게. 물건 이름은 띄어 쓴 낱말 각각과 붙여 쓴 전체를 본다("전신거울" → "전신 거울").
+// 두 글자 이상 토큰만(한 글자는 "흰"·"책"처럼 너무 많이 걸림). 방 낱말·뜻 없는 말은 tokenize에서 이미 빠진다.
+// 정렬은 (태그 점수, 설명 점수, 시드) 순이라 태그에 맞은 사진이 늘 먼저이고, 설명에만 맞은 사진은 그 뒤에 붙는다.
+const CAP_OBJ = .4, CAP_TEXT = .25;
+const capCache = new WeakMap();
+function capIndex(p){
+  const key = (p.caption || '') + '|' + (p.objects || []).join(';'), c = capCache.get(p);
+  if (c && c.key === key) return c;
+  const objs = new Set();
+  (p.objects || []).forEach(o => { const w = String(o).toLowerCase().split(/\s+/).filter(Boolean); if (!w.length) return; objs.add(w.join('')); w.forEach(x => objs.add(x)); });
+  const out = {key, objs: [...objs], words: [...new Set(String(p.caption || '').toLowerCase().split(/[\s,.·()"'!?/]+/).filter(Boolean))]};
+  capCache.set(p, out); return out;
+}
+const capObj = (ci, t) => t.length >= 2 && ci.objs.some(o => o.startsWith(t));
+const capScore = (ci, t) => t.length < 2 ? 0 : capObj(ci, t) ? CAP_OBJ : ci.words.some(w => w.startsWith(t)) ? CAP_TEXT : 0;
 function runSearch(q, seed){
   const {pos, neg} = tokenize(q);
   const scored = usable().map(p => {
-    const idx = searchIndex(p);
+    const idx = searchIndex(p), ci = capIndex(p);
     // 태그가 검색어를 품으면 1점, 검색어가 태그를 품기만 하면 0.5점 (턴테이블 → 테이블)
     // 한 글자 검색어는 태그·동의어와 똑같을 때만 (비 → 텔레비전, 큰 → 큰창문 같은 오탐 방지)
     const part = t => t.length >= 2 && idx.some(g => g.length >= 2 && t.includes(g));
     const match = t => t.length < 2 ? (idx.includes(t) ? 1 : 0) : idx.some(g => g.includes(t)) ? 1 : part(t) ? .5 : 0;
-    if (neg.some(match)) return null;
+    // 빼기: 태그에 걸리거나 물건 목록에 그 말이 있으면 뺀다 ("러그 없는 방")
+    if (neg.some(t => match(t) || capObj(ci, t))) return null;
     // 검색어가 방 낱말·뜻 없는 말·빼기뿐이면(원룸 인테리어, 예쁜 방, 러그 없는 방) 빼지 않은 사진이 모두 맞는 사진
-    return {p, score: pos.length ? pos.reduce((a,t) => a + match(t), 0) : 1, tie: hash(seed + q + p.id)};
+    const m = pos.map(match);
+    return {p, ci, m, score: pos.length ? m.reduce((a, x) => a + x, 0) : 1, cap: 0, tie: hash(seed + q + p.id)};
   }).filter(Boolean);
-  const hits = scored.filter(x => x.score > 0).sort((a,b) => b.score - a.score || a.tie - b.tie);
+  // 설명문은 풀의 어느 사진 태그에도 안 걸리는 토큰(어휘 빈칸: 피아노, 빈백, 에어컨 …)에만 쓴다.
+  // 태그로 찾을 수 있는 말은 태그 결과를 그대로 둔다 → 태그 낱말로만 된 검색(시작 단어 포함)은 결과 목록이 예전과 똑같다
+  pos.forEach((t, i) => { if (scored.some(x => x.m[i])) return; scored.forEach(x => { x.cap += capScore(x.ci, t); }); });
+  const hits = scored.filter(x => x.score > 0 || x.cap > 0).sort((a,b) => b.score - a.score || b.cap - a.cap || a.tie - b.tie);
+  const capHits = hits.filter(x => !x.score).length;
   let list = hits, padded = false;
   // 맞는 사진이 12장보다 적으면 나머지로 24장까지 채운다. 하나도 없으면 채우지 않는다(2026-10-27.6: 맞지 않는 사진만 보여 주면 검색이 고장 난 것처럼 보여서 → 제안 화면)
-  if (hits.length && hits.length < 12){ padded = true; list = hits.concat(scored.filter(x => x.score === 0).sort((a,b) => a.tie - b.tie).slice(0, 24 - hits.length)); }
+  if (hits.length && hits.length < 12){ padded = true; list = hits.concat(scored.filter(x => !x.score && !x.cap).sort((a,b) => a.tie - b.tie).slice(0, 24 - hits.length)); }
   const targetTerms = TARGETS.filter(t => S.settings.targets.includes(t.id) && t.kw.some(k => norm(q).includes(norm(k)))).map(t => t.id);
-  return {list: list.map(x => x.p), hits: hits.length, padded, pos, neg, targetTerms, broad: !pos.length};
+  return {list: list.map(x => x.p), hits: hits.length, capHits, padded, pos, neg, targetTerms, broad: !pos.length};
 }
 
 // 맞는 사진이 없을 때 보여 줄 제안 단어 (2026-10-27.6). 같은 검색어면 늘 같다(무작위 없음).
@@ -674,6 +701,19 @@ function updateLive(){
 setInterval(() => { if (S.mode !== 'search') updateLive(); }, 1000);
 
 /* ---------- 사진 풀 관리 ---------- */
+// 연구자용 사진 확인 표시 (pool/pool_flags.csv, 2026-10-27.7): 설명문을 쓰며 모델이 단 표시(워터마크·렌더 의심·AI 의심·저화질)와 메모.
+// 사람이 확인해야 하는 추정이다. 사진 풀 관리에서만 읽고(참여자 검색 화면은 읽지 않음), IndexedDB에도 넣지 않는다
+const FLAG_LABEL = {watermark: '워터마크', render_suspect: '렌더 의심', ai_suspect: 'AI 의심', low_quality: '저화질', not_room: '방 아님', collage: '여러 장'};
+const flagOf = p => (S.flags && p.fromPool && S.flags.get(p.name.normalize('NFC'))) || null;
+const flagText = f => f.flags.map(x => { const [k, ...v] = x.split(':'); return (FLAG_LABEL[k] || k) + (v.length ? ' ' + v.join(':') : ''); }).join(' · ');
+async function loadPoolFlags(){
+  if (S.flags || SEARCH_PAGE || !canSyncPool()) return;
+  S.flags = new Map();
+  const r = await fetch(POOL_DIR + 'pool_flags.csv', {cache: 'no-cache'}).catch(() => null);
+  if (!r || !r.ok) return;
+  parseCSV(await r.text()).forEach(x => { if (x.file) S.flags.set(x.file.normalize('NFC'), {flags: splitObjects(x.flags), note: x.note || ''}); });
+  drawGrid(); drawEditor();
+}
 function renderPool(){
   const ex = S.photos.filter(isExcluded).length, untagged = S.photos.filter(p => !p.tags.length).length;
   $('#body').innerHTML = `
@@ -692,7 +732,7 @@ function renderPool(){
           </div>
           <div class="row between">
             <div class="row">
-              <select id="flt" style="width:auto"><option value="all">전체 보기</option><option value="untagged">태그 없는 사진</option></select>
+              <select id="flt" style="width:auto"><option value="all">전체 보기</option><option value="untagged">태그 없는 사진</option><option value="flagged">확인 표시 있는 사진</option></select>
               <button class="btn sm ghost" id="sel-all">보이는 것 모두 선택</button><button class="btn sm ghost" id="sel-none">선택 해제</button>
               <button class="btn sm danger" id="del-sel" disabled>선택한 사진 삭제</button><button class="btn sm danger" id="del-all" ${S.photos.length ? '' : 'disabled'}>전체 삭제</button>
             </div>
@@ -718,7 +758,7 @@ function renderPool(){
   ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
   ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
   drop.addEventListener('drop', async e => { const files = await filesFromDrop(e.dataTransfer); addFiles(files); });
-  drawGrid(); drawEditor();
+  drawGrid(); drawEditor(); loadPoolFlags();
 }
 async function confirmDelete(btn, list){
   if (!list.length) return;
@@ -740,7 +780,7 @@ function syncDeleteButtons(){
   if (da && !da.dataset.sure) da.disabled = !S.photos.length;
 }
 function visible(){
-  return S.photos.filter(p => S.filter === 'all' || (S.filter === 'untagged' && !p.tags.length) || (S.filter === 'excluded' && isExcluded(p)) || (S.filter === 'usable' && !isExcluded(p)));
+  return S.photos.filter(p => S.filter === 'all' || (S.filter === 'untagged' && !p.tags.length) || (S.filter === 'flagged' && !!flagOf(p) && flagOf(p).flags.length > 0) || (S.filter === 'excluded' && isExcluded(p)) || (S.filter === 'usable' && !isExcluded(p)));
 }
 function drawGrid(){
   const g = $('#pgrid'); if (!g) return;
@@ -748,6 +788,7 @@ function drawGrid(){
   if (!S.photos.length){ g.innerHTML = '<div class="empty card" style="grid-column:1/-1">아직 사진이 없습니다. 팀이 찾은 방 사진을 위에 추가하세요.<br><span class="small">Unsplash 등에서 내려받은 침실·원룸 사진 150~250장을 권장합니다.</span></div>'; return; }
   g.innerHTML = list.map(p => `<button class="pitem" data-id="${p.id}" aria-pressed="${S.selected.has(p.id)}">
     <img loading="lazy" alt="${esc(p.name)}" src="${urlFor(p,'thumb')}">
+    ${(f => f && f.flags.length ? `<span class="flag chk" title="${esc(flagText(f) + (f.note ? ' — ' + f.note : '') + ' (모델 추정, 사람 확인 필요)')}">확인 · ${esc(flagText(f))}</span>` : '')(flagOf(p))}
     ${isExcluded(p) ? `<span class="flag ex">제외 · ${p.contains.map(id => TARGETS.find(t => t.id === id).name).join(', ')}</span>` : (!p.tags.length ? '<span class="flag none">태그 없음</span>' : '')}
     <div class="meta">${p.tags.length ? esc(p.tags.join(' · ')) : esc(p.name)}</div></button>`).join('') || '<p class="muted" style="grid-column:1/-1">조건에 맞는 사진이 없습니다.</p>';
   let last = null;
@@ -774,7 +815,9 @@ function drawEditor(){
   const custom = allTags.filter(t => !presets.has(t));
   ed.innerHTML = `
     <div class="row between"><h3>${sel.length}장 선택</h3><button class="btn sm ghost" id="ed-close">닫기</button></div>
-    ${one ? `<img src="${urlFor(one,'thumb')}" alt="" style="width:100%;border-radius:8px"><p class="small muted mono" style="word-break:break-all">${esc(one.name)}</p>` : ''}
+    ${one ? `<img src="${urlFor(one,'thumb')}" alt="" style="width:100%;border-radius:8px"><p class="small muted mono" style="word-break:break-all">${esc(one.name)}</p>
+      ${(f => f && (f.flags.length || f.note) ? `<div class="capbox" style="border:1px solid var(--research)"><b>확인 표시 (모델 추정)</b> ${esc(flagText(f) || '없음')}${f.note ? `<br>${esc(f.note)}` : ''}</div>` : '')(flagOf(one))}
+      ${one.caption || (one.objects || []).length ? `<div class="capbox"><b>설명</b> ${esc(one.caption || '')}${(one.objects || []).length ? `<br><b>물건</b> ${esc(one.objects.join(' · '))}` : ''}</div>` : ''}` : ''}
     ${TAG_GROUPS.map(g => `<div class="taggroup"><span>${g.name}</span><div class="tagbtns">${g.tags.map(t => `<button class="tagbtn" data-tag="${esc(t)}" aria-pressed="${state(p => p.tags.includes(t))}">${esc(t)}</button>`).join('')}</div></div>`).join('')}
     <div class="taggroup"><span>직접 입력한 태그</span><div class="tagbtns">${custom.map(t => `<button class="tagbtn" data-tag="${esc(t)}" aria-pressed="${state(p => p.tags.includes(t))}">${esc(t)}</button>`).join('') || '<span class="small muted">없음</span>'}</div>
       <div class="row"><input type="text" id="ed-new" placeholder="새 태그 (쉼표로 여러 개)" style="flex:1;width:auto"><button class="btn sm" id="ed-add">추가</button></div></div>
@@ -831,7 +874,7 @@ async function addFiles(fileList, meta){
     const [blob, thumb] = await Promise.all([shrink(f, MAX_EDGE), shrink(f, THUMB_EDGE)]);
     if (!blob){ failed++; continue; }
     const r = byName.get(nfc(f.name)) || byName.get(nfc(f.name).replace(/\.[^.]+$/, '.jpg')) || {};
-    const rec = {id:uid(), name:nfc(f.name), tags:(r.tags||'').split(/[;|]/).map(t => t.trim()).filter(Boolean), contains:targetIdsFrom(r.contains), blob, thumb, addedAt:Date.now() + i};
+    const rec = {id:uid(), name:nfc(f.name), tags:(r.tags||'').split(/[;|]/).map(t => t.trim()).filter(Boolean), contains:targetIdsFrom(r.contains), caption:r.caption || '', objects:splitObjects(r.objects), blob, thumb, addedAt:Date.now() + i};
     await DB.put(rec); S.photos.push(rec); existing.add(nfc(f.name)); added++;
     if (prog) prog.firstElementChild.style.width = ((i+1)/imgs.length*100) + '%';
   }
@@ -841,7 +884,8 @@ async function addFiles(fileList, meta){
 }
 async function exportPool(){
   if (!S.photos.length){ toast('내보낼 사진이 없습니다'); return; }
-  const csv = '﻿file,tags,contains\n' + S.photos.map(p => [p.name, p.tags.join(';'), p.contains.map(id => TARGETS.find(t => t.id === id).name).join(';')].map(v => /[",\n]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v).join(',')).join('\n');
+  const cell = v => /[",\n]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v;
+  const csv = '\ufefffile,tags,contains,caption,objects\n' + S.photos.map(p => [p.name, p.tags.join(';'), p.contains.map(id => TARGETS.find(t => t.id === id).name).join(';'), p.caption || '', (p.objects || []).join(';')].map(cell).join(',')).join('\n');
   if (typeof JSZip === 'undefined'){ download('pool.csv', csv, 'text/csv'); toast('인터넷 연결이 없어 태그 목록(pool.csv)만 저장했습니다'); return; }
   toast('ZIP을 만드는 중…');
   const zip = new JSZip(); zip.file('pool.csv', csv);
@@ -906,12 +950,13 @@ async function syncDefaultPool(force){
   const one = async i => {
     const r = rows[i], name = r.file.normalize('NFC'), id = poolId(name);
     const tags = (r.tags || '').split(/[;|]/).map(t => t.trim()).filter(Boolean), contains = targetIdsFrom(r.contains);
+    const caption = r.caption || '', objects = splitObjects(r.objects); // 2026-10-27.7: 사진 설명문·물건 목록 (검색 보조 색인)
     const old = S.photos.find(p => p.id === id);
-    if (old){ Object.assign(old, {tags, contains, addedAt:i}); await DB.put(old); keep.add(id); }
+    if (old){ Object.assign(old, {tags, contains, caption, objects, addedAt:i}); await DB.put(old); keep.add(id); }
     else {
       const blob = await fetch(POOL_DIR + 'photos/' + encodeURIComponent(name)).then(x => x.ok ? x.blob() : null).catch(() => null);
       const thumb = blob && await shrink(blob, THUMB_EDGE);
-      if (thumb){ const rec = {id, name, tags, contains, blob, thumb, addedAt:i, fromPool:true}; await DB.put(rec); S.photos.push(rec); keep.add(id); }
+      if (thumb){ const rec = {id, name, tags, contains, caption, objects, blob, thumb, addedAt:i, fromPool:true}; await DB.put(rec); S.photos.push(rec); keep.add(id); }
       else failed++;
     }
     n++; step(n, total); lock();
@@ -1091,7 +1136,7 @@ function doSearch(q){ const r = runSearch(q, 'pilot'); S.lastQuery = q; S.result
 function submitQuery(q, via){
   if (!q) return;
   const r = doSearch(q); S.resultLimit = 30;
-  if (!P.final){ (P.queries = P.queries || []).push(Object.assign({q, at: nowIso(), hits: r.hits, padded: r.padded, via}, r.broad ? {broad: true} : {})); if (!P.startedAt) P.startedAt = nowIso(); P.lastQ = q; P.resultLimit = 30; savePick(); }
+  if (!P.final){ (P.queries = P.queries || []).push(Object.assign({q, at: nowIso(), hits: r.hits, capHits: r.capHits, padded: r.padded, via}, r.broad ? {broad: true} : {})); if (!P.startedAt) P.startedAt = nowIso(); P.lastQ = q; P.resultLimit = 30; savePick(); }
   S.nextSource = 'search'; renderSearchUI(); window.scrollTo(0,0);
 }
 function renderSearchUI(){
