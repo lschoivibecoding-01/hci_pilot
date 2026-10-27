@@ -190,6 +190,17 @@ body.search-mode .topbar{display:none}
 @media (prefers-reduced-motion:reduce){.g-open::after{transition:none}}
 .g-more{display:flex;justify-content:center;margin-top:24px}
 .g-none{padding:48px 0;text-align:center;color:var(--muted)}
+.zero-hit .zh-title{margin:0;font-size:15px;font-weight:600}
+.zh-list{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
+.zh-list li{display:inline-flex;align-items:baseline;gap:6px;padding:6px 12px;border-radius:var(--pill);background:var(--card);font-size:14px}
+.zh-q{color:var(--ink);font-weight:500}
+.zh-n{color:var(--ink);font-weight:600;margin-right:1px}
+/* 맞는 사진이 없을 때 (2026-10-27.6): 사진 없이 안내 + 제안 단어 */
+.g-empty{display:flex;flex-direction:column;align-items:center;gap:20px;padding:72px 16px 48px;text-align:center}
+.g-empty-msg{margin:0;color:var(--body);font-size:18px;line-height:1.6;word-break:keep-all;text-wrap:balance}
+.g-empty-msg>span{display:inline-block}
+.g-empty-msg>span+span{color:var(--muted)}
+@media (max-width:767px){.g-empty{padding:48px 4px 32px;gap:16px}.g-empty-msg{font-size:16px}}
 /* 맞는 사진이 적어 나머지로 채운 검색: 맞는 사진 → "다른 사진" 구분 줄 → 채운 사진 (두 masonry 묶음) */
 .g-divider{display:flex;align-items:center;gap:16px;margin:32px 0 16px;color:var(--muted);font-size:14px;font-weight:600}
 .g-divider::before,.g-divider::after{content:"";flex:1;height:1px;background:var(--line)}
@@ -318,38 +329,127 @@ const TAG_GROUPS = [
   {name:'공간·전망', tags:['넓은','좁은','큰창문','다락','복층','높은천장','곡선','시티뷰','산뷰']},
   {name:'반려동물', tags:['고양이','강아지']}
 ];
-// 한국어 태그를 영어 검색어·비슷한 말로도 찾을 수 있게 하는 동의어 (검색 색인에만 쓰임)
+// 한국어 태그를 영어 검색어·외래어 표기 변형·비슷한 말로도 찾을 수 있게 하는 동의어 (검색 색인에만 쓰임, 2026-10-27.6에 넓힘)
+// 넣는 기준: 그 태그를 가리키는 말만 넣는다(정확도 우선). 예쁜·감성 같은 뜻 없는 말은 어느 태그에도 넣지 않는다(SKIP_WORDS).
+// 주의 1: 검색어가 동의어 안에 들어 있기만 해도 걸린다(검색어 "우드" ⊂ "우드블라인드"). 그래서 시작 단어(STARTER_CHIPS)와
+//   그 어간(모던·따뜻·베이지·우드·햇살·고급스러운·그레이/그레·넓은)을 품은 말은 다른 태그에 넣지 않는다(시작 단어 결과가 바뀜).
+// 주의 2: 검색어가 동의어를 품어도 0.5점이다("자연광" ⊃ "자연"). 짧은 동의어(두 글자)는 다른 말 속에 들어갈 수 있는지 보고 넣는다.
+// 뺀 것(2026-10-27.6): 따뜻한조명의 "조명"(조명이 들어간 모든 검색이 따뜻한조명에만 0.5점씩 걸림. "조명" 검색은 태그 이름으로 모든 조명에 그대로 걸림),
+//   담요의 "호텔침구"("호텔" 검색에 담요 사진이 다 걸림), 액자의 "패브릭포스터"("패브릭" 검색에 액자 사진이 다 걸림), 내추럴의 "자연"("자연광"이 내추럴에 걸림. "자연" 검색은 "자연스러운"으로 그대로 걸림).
+//   넣지 않은 것: 러그의 "카페트"("카페 같은 방"이 러그 사진에 다 걸림)
 const SYN = {
-  '아늑한':['cozy','cosy','포근','포근한'],'차분한':['calm','serene','peaceful','잔잔한','조용한'],'따뜻한':['warm','온기','따스한'],'시원한':['cool','fresh','청량','청량한','시원'],
-  '활기찬':['vibrant','lively','colorful','컬러풀','화사한','발랄한'],'몽환적':['dreamy','fantasy','판타지','몽환'],'고급스러운':['luxury','luxurious','elegant','고급','럭셔리'],
-  '모던':['modern','contemporary','시크','chic'],'미니멀':['minimal','minimalist','심플','simple'],'북유럽':['scandinavian','nordic','scandi'],'내추럴':['natural','자연','자연스러운'],
-  '빈티지':['vintage','retro','레트로'],'미드센추리':['mid century','midcentury','mid-century'],'보헤미안':['bohemian','boho','보호'],'재패니즈':['japanese','japandi','일본','일본풍','무인양품','muji'],
-  '호텔':['hotel','호텔식'],'인더스트리얼':['industrial'],'앤틱':['antique','classic','클래식','프렌치','french'],
-  '화이트':['white','흰','하얀','흰색','무채색','모노톤','올화이트'],'베이지':['beige','cream','크림','아이보리'],'브라운':['brown','갈색','테라코타'],'그레이':['gray','grey','회색','무채색','모노톤'],'블랙':['black','검정','검은','무채색','모노톤','올블랙'],
-  '그린':['green','초록','녹색'],'민트':['mint','민트색'],'블루':['blue','파란','파랑','하늘색','네이비','navy'],'옐로':['yellow','노란','노랑','머스타드'],'오렌지':['orange','주황','테라코타','terracotta'],
-  '핑크':['pink','분홍','연핑크'],'레드':['red','빨간','와인','버건디','burgundy'],'파스텔':['pastel','파스텔톤'],
-  '밝은':['bright','light','환한'],'어두운':['dark','moody','무드'],'햇살':['sunlight','sunny','daylight','햇빛','채광','아침','morning'],'노을':['sunset','golden hour','석양'],'저녁':['evening','night','밤','야경'],
-  '우드':['wood','wooden','나무','원목','우드톤'],'라탄':['rattan','wicker','등나무'],'패브릭':['fabric','천'],'가죽':['leather'],'대리석':['marble'],'콘크리트':['concrete','노출콘크리트'],
-  '퍼':['fur','faux fur','양털'],'유리':['glass','투명'],'금속':['metal','steel','철제','스틸','실버','silver'],
-  '체크':['check','checker','gingham','plaid','체커보드','깅엄'],'스트라이프':['stripe','striped','줄무늬'],'플라워':['floral','flower pattern','꽃무늬'],'기하학':['geometric','기하학무늬'],
-  '책상':['desk','workspace','작업','작업공간','재택','재택근무','컴퓨터','모니터'],'테이블':['table','식탁','원형테이블'],'소파':['sofa','couch'],'수납장':['storage','cabinet','drawer','서랍'],'책장':['bookshelf','shelf','선반'],
-  '옷장':['closet','wardrobe','붙박이장','옷'],'행거':['hanger','clothes rack','옷걸이'],'화장대':['vanity','dresser'],'거울':['mirror'],'커튼':['curtain','curtains'],'블라인드':['blind','blinds'],
-  'TV':['tv','television','티비','텔레비전'],
-  '바닥매트리스':['floor mattress','mattress','매트리스','바닥'],'저상형':['low bed','platform bed','저상형침대','낮은','낮은침대'],'수납침대':['storage bed','서랍침대'],'헤드보드':['headboard','침대헤드'],
-  '스탠드':['lamp','floor lamp','table lamp','램프','무드등','스탠드조명'],'따뜻한조명':['warm light','간접조명','전구색','노란조명','조명'],'펜던트':['pendant','천장조명','펜던트조명'],
-  '종이조명':['paper lamp','paper lantern','한지','한지조명'],'줄조명':['fairy lights','string lights','전구','알전구','가랜드'],
-  '식물':['plant','plants','greenery','화분','플랜테리어','몬스테라'],'러그':['rug','carpet','카펫'],'담요':['blanket','throw','bed runner','블랭킷','스로우','베드러너','보조이불','겹친침구','호텔침구'],'액자':['art','poster','painting','frame','그림','포스터','패브릭포스터','벽그림'],
-  '사진벽':['photo wall','gallery wall','사진'],'꽃':['flower','flowers','꽃병','화병'],'인형':['doll','plush','teddy','곰인형'],'책':['books','book','독서'],'시계':['clock','벽시계'],
-  '빔프로젝터':['projector','빔','프로젝터'],'턴테이블':['turntable','record player','레코드','lp','음악'],
-  '깔끔한':['clean','tidy','neat','정돈','정돈된'],'생활감':['lived-in','messy','현실','현실적'],'맥시멀':['maximal','maximalist','아기자기'],
-  '넓은':['spacious','large','big'],'좁은':['small','narrow','compact','작은'],'큰창문':['window','big window','창문','창','통창','창가'],'다락':['attic','loft','다락방','경사천장'],
-  '복층':['duplex','mezzanine','loft bed','2층'],'높은천장':['high ceiling','층고'],'곡선':['curved','organic','round','둥근','아치'],
-  '시티뷰':['city view','city','skyline','도시','전망','view','야경'],'산뷰':['mountain view','mountain','산','전망','view'],
-  '고양이':['cat','cats','반려동물','pet','반려묘'],'강아지':['dog','puppy','개','반려동물','pet','반려견']
+  // 분위기
+  '아늑한':['cozy','cosy','포근','포근한','코지','아늑함','편안한','안락한'],
+  '차분한':['calm','serene','peaceful','잔잔한','조용한','차분','고요한','정적인'],
+  '따뜻한':['warm','온기','따스한','웜톤','온화한'],
+  '시원한':['cool','fresh','청량','청량한','시원','쿨톤','청량감'],
+  '활기찬':['vibrant','lively','colorful','컬러풀','화사한','발랄한','알록달록','비비드','vivid','경쾌한'],
+  '몽환적':['dreamy','fantasy','판타지','몽환','신비로운'],
+  '고급스러운':['luxury','luxurious','elegant','고급','럭셔리','우아한','하이엔드','고급진'],
+  // 스타일
+  '모던':['modern','contemporary','시크','chic','모던한','세련된','컨템포러리'],
+  '미니멀':['minimal','minimalist','심플','simple','미니멀리즘','미니멀리스트','minimalism','단순한'],
+  '북유럽':['scandinavian','nordic','scandi','스칸디','스칸디나비안','스칸디나비아','노르딕'],
+  '내추럴':['natural','자연스러운','내츄럴','네추럴','네츄럴','자연주의'],
+  '빈티지':['vintage','retro','레트로','빈티지한','복고','뉴트로'],
+  '미드센추리':['mid century','midcentury','mid-century','미드센츄리','미드센트리','미드세기'],
+  '보헤미안':['bohemian','boho','보호','보헤미언','보헤미아'],
+  '재패니즈':['japanese','japandi','일본','일본풍','일본식','무인양품','muji','재팬디','젠','zen','와비사비','다다미','료칸'],
+  '호텔':['hotel','호텔식','호캉스','호텔룸','호텔침실'],
+  '인더스트리얼':['industrial','공업풍','인더스트리얼풍','인더스트리',"공장형"],
+  '앤틱':['antique','classic','클래식','프렌치','french','앤티크','엔틱','엔티크','고전적인','클래식한'],
+  // 색
+  '화이트':['white','흰','하얀','흰색','하얀색','무채색','모노톤','올화이트','화이트톤','백색','순백','흑백','monotone'],
+  '베이지':['beige','cream','크림','아이보리','ivory','크림톤','크림색','샌드베이지','오트밀','oatmeal','뉴트럴','neutral','라떼'],
+  '브라운':['brown','갈색','테라코타','브라운톤','초콜릿','초코','카멜','camel','모카','고동색'],
+  '그레이':['gray','grey','회색','무채색','모노톤','그레이톤','회색톤','차콜','charcoal','monotone'],
+  '블랙':['black','검정','검은','무채색','모노톤','올블랙','블랙톤','검은색','검정색','흑백','monotone'],
+  '그린':['green','초록','녹색','올리브','olive','카키','khaki','세이지','sage','그린톤','초록색','녹색톤'],
+  '민트':['mint','민트색','민트톤'],
+  '블루':['blue','파란','파랑','하늘색','네이비','navy','파란색','남색','코발트','인디고','블루톤'],
+  '옐로':['yellow','노란','노랑','머스타드','옐로우','노란색','mustard','레몬'],
+  '오렌지':['orange','주황','테라코타','terracotta','주황색','오렌지색'],
+  '핑크':['pink','분홍','연핑크','분홍색','핑크색','핑크톤','인디핑크','로즈'],
+  '레드':['red','빨간','와인','버건디','burgundy','빨강','빨간색','와인색','레드톤'],
+  '파스텔':['pastel','파스텔톤','파스텔색'],
+  // 빛·시간대
+  '밝은':['bright','light','환한','밝게','밝은톤'],
+  '어두운':['dark','moody','무드','다크','다크톤','어둑한','어둡게'],
+  '햇살':['sunlight','sunny','daylight','햇빛','채광','아침','morning','자연광','햇볕','볕','일광'],
+  '노을':['sunset','golden hour','석양','선셋','해질녘','노을빛','골든아워'],
+  '저녁':['evening','night','밤','야경','나이트','밤풍경','야간'],
+  // 소재·질감
+  '우드':['wood','wooden','나무','원목','우드톤','원목톤','나무톤','월넛','walnut','오크','oak','원목가구'],
+  '라탄':['rattan','wicker','등나무','라탄가구'],
+  '패브릭':['fabric','천','린넨','리넨','linen','코튼','cotton','벨벳','velvet','부클','부클레','boucle','실크','silk'],
+  '가죽':['leather','레더','인조가죽'],
+  '대리석':['marble','마블','마블링'],
+  '콘크리트':['concrete','노출콘크리트','시멘트','cement','콘크리트벽'],
+  '퍼':['fur','faux fur','양털','인조털','털'],
+  '유리':['glass','투명','글라스'],
+  '금속':['metal','steel','철제','스틸','실버','silver','메탈','메탈릭','metallic','스테인리스','스테인레스','stainless','스텐','크롬','chrome','골드','gold','금색','황동','브라스','brass','아이언','iron','철','알루미늄','은색'],
+  // 패턴
+  '체크':['check','checker','gingham','plaid','체커보드','깅엄','체크무늬','격자무늬','타탄','tartan'],
+  '스트라이프':['stripe','striped','줄무늬','스트라이프무늬'],
+  '플라워':['floral','flower pattern','꽃무늬','플로럴'],
+  '기하학':['geometric','기하학무늬','기하학적','도형무늬'],
+  // 가구
+  '책상':['desk','workspace','작업','작업공간','재택','재택근무','컴퓨터','모니터','데스크','홈오피스','공부','작업실','데스크테리어','컴퓨터책상'],
+  '테이블':['table','식탁','원형테이블','협탁','사이드테이블','티테이블','좌식테이블','커피테이블'],
+  '소파':['sofa','couch','쇼파','카우치','소파베드','1인소파'],
+  '수납장':['storage','cabinet','drawer','서랍','서랍장','캐비닛','캐비넷','수납가구'],
+  '책장':['bookshelf','shelf','선반','책꽂이','북쉘프','벽선반','선반장'],
+  '옷장':['closet','wardrobe','붙박이장','옷','장롱','드레스룸'],
+  '행거':['hanger','clothes rack','옷걸이','옷행거'],
+  '화장대':['vanity','dresser','메이크업'],
+  '거울':['mirror','전신거울','벽거울','스탠딩거울'],
+  '커튼':['curtain','curtains','암막커튼','쉬폰커튼'],
+  '블라인드':['blind','blinds','롤스크린','롤블라인드'],
+  'TV':['tv','television','티비','텔레비전','티브이'],
+  // 침대
+  '바닥매트리스':['floor mattress','mattress','매트리스','바닥','토퍼','바닥침대'],
+  '저상형':['low bed','platform bed','저상형침대','낮은','낮은침대','저상','로우베드','저상침대'],
+  '수납침대':['storage bed','서랍침대','수납형침대'],
+  '헤드보드':['headboard','침대헤드','헤드'],
+  // 조명
+  '스탠드':['lamp','floor lamp','table lamp','램프','무드등','스탠드조명','장스탠드','단스탠드','플로어램프','무드조명'],
+  '따뜻한조명':['warm light','간접조명','전구색','노란조명','간접등','웜조명','은은한조명'],
+  '펜던트':['pendant','천장조명','펜던트조명','펜던트등','샹들리에','chandelier','천장등'],
+  '종이조명':['paper lamp','paper lantern','한지','한지조명','종이등','페이퍼램프','노구치'],
+  '줄조명':['fairy lights','string lights','전구','알전구','가랜드','앵두전구','전구줄','가렌다'],
+  // 소품·장식 (식물·러그·액자·담요는 타깃 요소이기도 하다. 참여자가 찾을 만한 말만 넣는다)
+  '식물':['plant','plants','greenery','화분','플랜테리어','몬스테라','화초','관엽식물','반려식물','다육이','선인장','식물인테리어'],
+  '러그':['rug','carpet','카펫'],
+  '담요':['blanket','throw','bed runner','블랭킷','스로우','베드러너','보조이불','겹친침구','침구겹침'],
+  '액자':['art','poster','painting','frame','그림','포스터','벽그림','아트포스터','그림액자','캔버스','아트월'],
+  '사진벽':['photo wall','gallery wall','사진','포토월'],
+  '꽃':['flower','flowers','꽃병','화병','생화','조화','꽃다발'],
+  '인형':['doll','plush','teddy','곰인형','애착인형','봉제인형','곰돌이'],
+  '책':['books','book','독서','도서','책들'],
+  '시계':['clock','벽시계','탁상시계'],
+  '빔프로젝터':['projector','빔','프로젝터','홈시어터','빔프'],
+  '턴테이블':['turntable','record player','레코드','lp','음악','엘피','레코드플레이어'],
+  // 생활감
+  '깔끔한':['clean','tidy','neat','정돈','정돈된','정리된','깔끔'],
+  '생활감':['lived-in','messy','현실','현실적','현실감'],
+  '맥시멀':['maximal','maximalist','아기자기','맥시멀리즘','맥시멀리스트','키치','kitsch'],
+  // 공간·전망
+  '넓은':['spacious','large','big','널찍한','넓직한'],
+  '좁은':['small','narrow','compact','작은','아담한','협소','협소한'],
+  '큰창문':['window','big window','창문','창','통창','창가','전면창','큰창'],
+  '다락':['attic','loft','다락방','경사천장'],
+  '복층':['duplex','mezzanine','loft bed','2층','벙커침대','이층침대'],
+  '높은천장':['high ceiling','층고','층고높은','높은층고'],
+  '곡선':['curved','organic','round','둥근','아치','아치형','라운드','곡선형','곡선가구'],
+  '시티뷰':['city view','city','skyline','도시','전망','view','야경','도시뷰','한강뷰','도심'],
+  '산뷰':['mountain view','mountain','산','전망','view','마운틴뷰','숲뷰'],
+  // 반려동물
+  '고양이':['cat','cats','반려동물','pet','반려묘','냥이','냥','고냥이','캣'],
+  '강아지':['dog','puppy','개','반려동물','pet','반려견','댕댕이','멍멍이']
 };
 const MAX_EDGE = 1600, THUMB_EDGE = 420;
 // 앱 버전: 기록마다 붙는다. 화면·기록 방식을 바꾸면 날짜와 순번을 올린다
-const APP_VERSION = '2026-10-27.5';
+const APP_VERSION = '2026-10-27.6';
 // 참여자 화면의 과제 안내 한 줄 (검색 그룹 진행 대본의 과제 문장 + 하트 안내). 동작 이름은 "담기", 모은 사진은 "담은 사진"으로 통일
 const TASK_LINE = '다음에 혼자 지낼 방으로 가장 마음에 드는 사진을 한 장 골라 주세요. 마음에 드는 사진은 하트를 눌러 담아 두세요.';
 // 첫 화면 검색창 아래 시작 단어 (모든 참여자에게 같은 순서, 바꾸지 않는다).
@@ -454,18 +554,23 @@ function searchIndex(p){
 const isExcluded = () => false; // contains는 비율 조정용 표시일 뿐, 검색에서 빼지 않음
 const usable = () => S.photos.filter(p => !isExcluded(p));
 // 방·침대 자체를 가리키는 말은 점수에 넣지 않음 ("차분한 방"의 "방"이 자취방·다락방에 걸리지 않게)
-const ROOM_WORDS = new Set(['방','방을','방이','침실','원룸','투룸','자취방','거실','집','인테리어','사진','room','rooms','bedroom','interior','photo','침대','bed','beds','벽','천장','공간','컬러','color','오피스텔']);
+const ROOM_WORDS = new Set(['방','방을','방이','침실','원룸','투룸','자취방','거실','집','인테리어','사진','room','rooms','bedroom','interior','photo','침대','bed','beds','벽','천장','공간','컬러','color','오피스텔',
+  '자취','룸','홈','하우스','방꾸미기','방꾸','집꾸미기','집꾸','꾸미기','룸투어','침실인테리어','원룸인테리어','자취방인테리어','방인테리어','집인테리어','가구']);
+// 어느 태그도 가리키지 않는 뜻 없는 말 (2026-10-27.6). 태그로 보내지 않고 방 낱말처럼 점수에서 뺀다 ("북유럽 감성" = "북유럽")
+const SKIP_WORDS = new Set(['감성','갬성','감성적인','예쁜','이쁜','예쁘게','좋은','멋진','느낌','분위기','스타일','디자인','추천','인스타','인스타감성','오늘의집','같은','있는','많은']);
+const skipWord = t => ROOM_WORDS.has(t) || SKIP_WORDS.has(t);
 function tokenize(q){
   const neg = [], pos = [];
   const rest = q.toLowerCase().replace(/(\S+?)\s*(없는|없이|빼고|제외|말고)/g, (_, w) => { neg.push(w); return ' '; });
   rest.split(/[\s,]+/).filter(Boolean).forEach(t => {
     if (t.startsWith('-') && t.length > 1){ neg.push(t.slice(1)); return; }
-    if (ROOM_WORDS.has(t)) return;
+    if (skipWord(t)) return;
     const py = t.match(/^(\d+)평$/); // 평수: 10평 이하는 좁은 방으로 본다
     if (py){ if (+py[1] <= 10) pos.push('좁은'); return; }
+    const stem = t.replace(/(한|인|의|을|를|이|가|은|는|에|로|으로|같은|느낌|스타일|분위기|있는|처럼|톤|색|이랑|랑|만|하게|게|에서|감성|풍|방|인테리어)$/,'');
+    if (stem && stem !== t && skipWord(stem)) return; // "자취방감성", "원룸인테리어"처럼 방 낱말 + 꼬리뿐인 말
     pos.push(t);
-    const stem = t.replace(/(한|인|의|을|를|이|가|은|는|에|로|으로|같은|느낌|스타일|분위기|있는|처럼|톤|색|이랑|랑|만|하게|게|에서)$/,'');
-    if (stem && stem !== t && !ROOM_WORDS.has(stem)) pos.push(stem);
+    if (stem && stem !== t) pos.push(stem);
   });
   return {pos:[...new Set(pos)], neg:[...new Set(neg)]};
 }
@@ -478,13 +583,34 @@ function runSearch(q, seed){
     const part = t => t.length >= 2 && idx.some(g => g.length >= 2 && t.includes(g));
     const match = t => t.length < 2 ? (idx.includes(t) ? 1 : 0) : idx.some(g => g.includes(t)) ? 1 : part(t) ? .5 : 0;
     if (neg.some(match)) return null;
-    return {p, score: pos.reduce((a,t) => a + match(t), 0), tie: hash(seed + q + p.id)};
+    // 검색어가 방 낱말·뜻 없는 말·빼기뿐이면(원룸 인테리어, 예쁜 방, 러그 없는 방) 빼지 않은 사진이 모두 맞는 사진
+    return {p, score: pos.length ? pos.reduce((a,t) => a + match(t), 0) : 1, tie: hash(seed + q + p.id)};
   }).filter(Boolean);
   const hits = scored.filter(x => x.score > 0).sort((a,b) => b.score - a.score || a.tie - b.tie);
   let list = hits, padded = false;
-  if (hits.length < 12){ padded = true; list = hits.concat(scored.filter(x => x.score === 0).sort((a,b) => a.tie - b.tie).slice(0, 24 - hits.length)); }
+  // 맞는 사진이 12장보다 적으면 나머지로 24장까지 채운다. 하나도 없으면 채우지 않는다(2026-10-27.6: 맞지 않는 사진만 보여 주면 검색이 고장 난 것처럼 보여서 → 제안 화면)
+  if (hits.length && hits.length < 12){ padded = true; list = hits.concat(scored.filter(x => x.score === 0).sort((a,b) => a.tie - b.tie).slice(0, 24 - hits.length)); }
   const targetTerms = TARGETS.filter(t => S.settings.targets.includes(t.id) && t.kw.some(k => norm(q).includes(norm(k)))).map(t => t.id);
-  return {list: list.map(x => x.p), hits: hits.length, padded, pos, neg, targetTerms};
+  return {list: list.map(x => x.p), hits: hits.length, padded, pos, neg, targetTerms, broad: !pos.length};
+}
+
+// 맞는 사진이 없을 때 보여 줄 제안 단어 (2026-10-27.6). 같은 검색어면 늘 같다(무작위 없음).
+// 검색어가 어느 태그 묶음(TAG_GROUPS)과 두 글자 이상 겹치면(태그·동의어·묶음 이름의 한글 두 글자 조각) 가장 많이 겹친 묶음(같으면 앞 묶음)의
+// 다른 태그 중 사진이 SUGGEST_MIN장 이상인 것을 묶음 순서대로 최대 6개. 겹치는 묶음이 없거나 고를 태그가 2개보다 적으면 시작 단어 앞 6개.
+// 타깃 요소 D 태그(식물·러그·액자·스탠드·담요)는 제안하지 않는다(제안이 노출을 D 쪽으로 기울이지 않게)
+const SUGGEST_MAX = 6, SUGGEST_MIN = 8, SUGGEST_NEVER = new Set(['식물','러그','액자','스탠드','담요']);
+const hangulBigrams = s => { const out = new Set(), x = String(s || '').toLowerCase().replace(/[^가-힣]/g, ' '); x.split(' ').forEach(w => { for (let i = 0; i + 1 < w.length; i++) out.add(w.slice(i, i + 2)); }); return out; };
+function suggestFor(q){
+  const {pos} = tokenize(q), qb = new Set(pos.flatMap(t => [...hangulBigrams(t)]));
+  const count = {}; usable().forEach(p => p.tags.forEach(t => count[t] = (count[t] || 0) + 1));
+  let best = null, bestN = 0;
+  if (qb.size) TAG_GROUPS.forEach(g => {
+    const words = [g.name, ...g.tags.flatMap(t => [t, ...(SYN[t] || [])])], gb = new Set(words.flatMap(w => [...hangulBigrams(w)]));
+    const n = [...qb].filter(b => gb.has(b)).length;
+    if (n > bestN){ best = g; bestN = n; }
+  });
+  const fromGroup = best ? best.tags.filter(t => !SUGGEST_NEVER.has(t) && (count[t] || 0) >= SUGGEST_MIN).slice(0, SUGGEST_MAX) : [];
+  return fromGroup.length >= 2 ? {words: fromGroup, from: best.name} : {words: STARTER_CHIPS.slice(0, SUGGEST_MAX), from: 'start'};
 }
 
 /* ================= 렌더 ================= */
@@ -960,11 +1086,12 @@ function bindLikeButtons(root){ $$('[data-like]', root).forEach(b => b.onclick =
 // 검색 실행 (같은 검색어·시드면 늘 같은 결과라 새로고침 뒤에도 그대로 복원된다)
 function doSearch(q){ const r = runSearch(q, 'pilot'); S.lastQuery = q; S.results = r.list; S.resultMeta = {hits: r.hits, padded: r.padded}; return r; }
 
-// 검색 한 번: 검색창에 쳐서(typed) 또는 첫 화면 시작 단어를 눌러서(chip). 둘 다 똑같이 검색하고 queries[].via에 어디서 왔는지 남긴다
+// 검색 한 번: 검색창에 쳐서(typed), 첫 화면 시작 단어를 눌러서(chip), 맞는 사진이 없을 때 제안 단어를 눌러서(suggest, 2026-10-27.6).
+// 모두 똑같이 검색하고 queries[].via에 어디서 왔는지 남긴다. 방 낱말·뜻 없는 말뿐인 검색(모든 사진이 맞음)은 broad: true
 function submitQuery(q, via){
   if (!q) return;
   const r = doSearch(q); S.resultLimit = 30;
-  if (!P.final){ (P.queries = P.queries || []).push({q, at: nowIso(), hits: r.hits, padded: r.padded, via}); if (!P.startedAt) P.startedAt = nowIso(); P.lastQ = q; P.resultLimit = 30; savePick(); }
+  if (!P.final){ (P.queries = P.queries || []).push(Object.assign({q, at: nowIso(), hits: r.hits, padded: r.padded, via}, r.broad ? {broad: true} : {})); if (!P.startedAt) P.startedAt = nowIso(); P.lastQ = q; P.resultLimit = 30; savePick(); }
   S.nextSource = 'search'; renderSearchUI(); window.scrollTo(0,0);
 }
 function renderSearchUI(){
@@ -999,12 +1126,13 @@ function renderSearchUI(){
 function drawResults(source, before){
   const box = $('#results'); if (!box) return;
   const shown = S.results.slice(0, S.resultLimit);
-  if (!shown.length){ box.innerHTML = '<p class="g-none">검색 결과가 없습니다.</p>'; $('#more').hidden = true; return; }
+  if (!shown.length){ drawNoMatch(box, source); return; }
   // 맞는 사진이 적어 나머지로 채웠으면: 맞는 사진 묶음 → "다른 사진" 구분 줄 → 채운 사진 묶음 (masonry 두 개, 순위는 이어서 매김)
   // 맞는 사진이 하나도 없으면 구분 줄 대신 짧은 안내 한 줄 뒤에 채운 사진
   const m = S.resultMeta || {}, nHit = m.padded ? Math.min(m.hits || 0, shown.length) : shown.length;
   const block = (list, from) => `<div class="g-grid">${list.map((p, i) => tile(p, 'search', from + i)).join('')}</div>`;
   box.style.minHeight = box.offsetHeight + 'px'; // 다시 그리는 동안 높이를 붙잡아 둔다 (결과 더 보기에서 스크롤이 위로 튀지 않게)
+  // (2026-10-27.6부터 맞는 사진이 0장이면 채우지 않고 drawNoMatch. 아래 "0장 + 채움"은 예전 상태를 되살릴 때만 남은 길)
   box.innerHTML = nHit === shown.length ? block(shown, 1)
     : nHit === 0 ? `<p class="g-note">맞는 사진이 없어 다른 사진을 보여 드려요</p>${block(shown, 1)}`
     : `${block(shown.slice(0, nHit), 1)}<div class="g-divider" role="separator">다른 사진</div>${block(shown.slice(nHit), nHit + 1)}`;
@@ -1018,6 +1146,22 @@ function drawResults(source, before){
   $$('.g-grid', box).forEach(g => masonry(g, () => measureTiles(box)));
   box.style.minHeight = '';
   observeTiles(box);
+}
+
+// 맞는 사진이 없을 때: 사진은 보여 주지 않고 안내 + 제안 단어. 누르면 그 말로 검색(queries[].via = 'suggest').
+// 노출 기록에는 사진 없는 묶음(ids: [], none: true, sugg: 보여 준 제안)을 남긴다 (impressions.csv에는 줄이 생기지 않음)
+function drawNoMatch(box, source){
+  const q = S.lastQuery || '', sg = suggestFor(q), shortQ = q.length > 24 ? q.slice(0, 23) + '…' : q;
+  box.innerHTML = `<div class="g-empty" role="status"><p class="g-empty-msg"><span>‘${esc(shortQ)}’에 맞는 사진이 없어요.</span> <span>다른 단어로 찾아보세요.</span></p>
+    <ul class="g-chips" aria-label="이런 단어로 찾아보세요">${sg.words.map(c => `<li><button class="g-chip" type="button" data-suggest="${esc(c)}">${esc(c)}</button></li>`).join('')}</ul></div>`;
+  $$('[data-suggest]', box).forEach(b => b.onclick = () => submitQuery(b.dataset.suggest, 'suggest'));
+  $('#more').hidden = true;
+  S.owner = {};
+  if (source !== 'more' && !P.final){
+    const {qn} = curQ(), via = qn ? ((P.queries || [])[qn - 1] || {}).via || null : null;
+    (P.shows = P.shows || []).push({n: P.shows.length + 1, qn, q: curQ().q, via, at: nowIso(), source, from: 1, ids: [], padded: false, hits: 0, total: 0, none: true, sugg: sg.words, vis: {}, sz: {}, vw: window.innerWidth, vh: window.innerHeight});
+    savePick();
+  }
 }
 
 function renderSavedUI(){
@@ -1249,13 +1393,14 @@ function renderArchive(){
       <div class="row">${whos.length > 1 ? `<select id="arch-who" style="width:auto" aria-label="진행자별 보기"><option value="">모든 진행자</option>${whos.map(w => `<option value="${esc(w)}" ${S.archWho === w ? 'selected' : ''}>${esc(w || '(이름 없음)')} · ${ARCH.filter(r => (r.researcher || '') === w).length}명</option>`).join('')}</select>` : ''}
         <label class="btn sm" for="arch-imp" style="cursor:pointer" title="각자 내보낸 ZIP을 올리면 기록을 합쳐서 보여 줍니다. 여러 개를 한 번에 고를 수 있어요">기록 불러오기 (ZIP)</label><input type="file" id="arch-imp" accept=".zip,.json" multiple hidden>
         <button class="btn sm" id="arch-zip" ${list.length ? '' : 'disabled'}>기록 + 최종 사진 (ZIP)</button></div></div>
+    ${zeroHitHTML(list)}
     ${list.length ? list.map(r => `<div class="card stack arch" data-arch="${r.id}">
       <div class="row between">
         <div class="row"><span class="mono small muted">#${r.no}</span><input type="text" class="arch-label" data-f="label" value="${esc(r.label)}" placeholder="참여자 ID" aria-label="참여자 ID (#${r.no})"><span class="pill ${r.status === '완료' ? 'ok' : 'warn'}">${r.status}</span>${r.imported ? '<span class="pill">불러온 기록</span>' : ''}${sheetBadge(r)}</div>
         <div class="row">${r.final && photoById(r.final.id) ? `<a class="btn sm" href="${urlFor(photoById(r.final.id),'full')}" download="P${r.no}_FINAL_${esc(r.final.name.replace(/\.[^.]+$/, ''))}.jpg">최종 사진 저장</a>` : ''}${sheetCfg().url ? `<button class="btn sm" data-sheet="${r.id}" type="button" ${r.sheet && r.sheet.state === 'sending' && (r.sheet.until || 0) > Date.now() ? 'disabled' : ''}>${r.sheet ? '시트로 다시 보내기' : '시트로 보내기'}</button>` : ''}<button class="btn sm danger" data-del="${r.id}" type="button">기록 삭제</button></div>
       </div>
       <dl class="kv"><dt>진행자</dt><dd>${esc(r.researcher || '—')}</dd><dt>${r.status === '완료' ? '결정 시각' : '기록 시각'}</dt><dd class="mono">${fmtTime(r.finishedAt)} (첫 검색부터 ${durMin(r)})</dd>
-        <dt>검색어 (${(r.queries || []).length}회)</dt><dd>${(r.queries || []).length ? `<ol class="q-list">${r.queries.map(x => `<li><span class="mono small muted">${new Date(x.at).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'})}</span> ${esc(x.q)}${x.hits != null ? ` <span class="small muted">· 일치 ${x.hits}장${x.padded ? ' · 나머지 사진으로 채움' : ''}${x.via === 'chip' ? ' · 시작 단어' : ''}</span>` : ''}</li>`).join('')}</ol>` : '—'}</dd>
+        <dt>검색어 (${(r.queries || []).length}회)</dt><dd>${(r.queries || []).length ? `<ol class="q-list">${r.queries.map(x => `<li><span class="mono small muted">${new Date(x.at).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'})}</span> ${esc(x.q)}${x.hits != null ? ` <span class="small muted">· 일치 ${x.hits}장${x.padded ? ' · 나머지 사진으로 채움' : ''}${x.hits === 0 && !x.padded ? ' · 제안 화면' : ''}${x.broad ? ' · 조건 없음(모든 사진)' : ''}${x.via === 'chip' ? ' · 시작 단어' : x.via === 'suggest' ? ' · 제안 단어' : ''}</span>` : ''}</li>`).join('')}</ol>` : '—'}</dd>
         <dt>노출</dt><dd>${(st => st ? `<span class="mono">${st.total}</span>회 (서로 다른 사진 <span class="mono">${st.unique}</span>장, 화면에 보인 것 <span class="mono">${st.inView}</span>회) · 크게 보기 <span class="mono">${st.previews}</span>회 · 채운 검색 <span class="mono">${st.padded}</span>회` : '<span class="muted">— (이전 버전 기록)</span>')(impStats(r))}</dd>
         <dt>담은 사진</dt><dd class="mono">${r.liked.length}장</dd>
         <dt>최종 사진</dt><dd class="mono" style="word-break:break-all">${r.final ? esc(r.final.name) : '—'}</dd>
@@ -1281,15 +1426,30 @@ function renderArchive(){
   $('#arch-imp').onchange = e => importArchive(e.target.files);
   const zp = $('#arch-zip'); if (zp) zp.onclick = exportArchiveZip;
 }
+// 맞는 사진이 0장이던 검색어 (2026-10-27.6). 예전 기록의 0장 검색(그때는 나머지 사진으로 채움)도 hits가 0이면 들어간다
+const zeroHitQs = r => (r.queries || []).filter(x => x.hits === 0).map(x => x.q);
+// 참여자 기록 탭: 보이는 기록 전체에서 맞는 사진이 없던 검색어를 모아 센다 (파일럿 중 어휘 빈칸 찾기용)
+function zeroHitHTML(list){
+  const m = new Map();
+  list.forEach(r => zeroHitQs(r).forEach(q => {
+    const k = String(q).trim().toLowerCase().replace(/\s+/g, ' '); if (!k) return;
+    const e = m.get(k) || {q: String(q).trim(), n: 0, who: new Set()}; e.n++; e.who.add(r.label || ('#' + r.no)); m.set(k, e);
+  }));
+  const rows = [...m.values()].sort((a, b) => b.n - a.n || a.q.localeCompare(b.q, 'ko'));
+  return `<section class="card stack zero-hit" aria-labelledby="zh-title"><div class="row between"><h3 id="zh-title" class="zh-title">맞는 사진이 없던 검색어</h3><span class="small muted">보이는 기록 ${list.length}건 · 검색어 ${rows.length}개 · 사전(SYN)에 넣을 말이나 풀에 없는 사진을 찾는 데 씁니다</span></div>
+    ${rows.length ? `<ul class="zh-list">${rows.map(e => `<li><span class="zh-q">${esc(e.q)}</span><span class="small muted"><b class="mono zh-n">${e.n}</b>회 · ${[...e.who].map(esc).join(', ')}</span></li>`).join('')}</ul>` : '<p class="small muted">아직 없습니다.</p>'}</section>`;
+}
 // 최종 사진을 담은 검색 (번호:검색어)
 const finalQueryOf = r => { const f = r.final && r.liked.find(x => x.id === r.final.id); return f && f.qn ? `${f.qn}:${f.q}` : ''; };
 function archiveCSV(recs = ARCH){
   const cell = v => { const x = String(v ?? ''); return /[",\n]/.test(x) ? `"${x.replace(/"/g,'""')}"` : x; };
   const head = ['no','researcher','participant_id','status','started_at','finished_at','query_count','queries','liked_count','liked_with_query','unliked_count','final_query','liked_files','final_file','final_in_liked_order',
-    'app_version','pool_ver','impressions_total','impressions_in_viewport','unique_photos_seen','unique_photos_in_viewport','previews_count','preview_dwell_ms_total','padded_queries'];
+    'app_version','pool_ver','impressions_total','impressions_in_viewport','unique_photos_seen','unique_photos_in_viewport','previews_count','preview_dwell_ms_total','padded_queries',
+    'zero_hit_queries']; // 맨 끝 zero_hit_queries는 2026-10-27.6부터 (예전 기록도 hits가 0인 검색이 있으면 채워짐)
   const rows = recs.map(r => [r.no, r.researcher || '', r.label, r.status, r.startedAt || '', r.finishedAt || '', (r.queries || []).length, (r.queries || []).map(x => x.q).join(' | '), r.liked.length, r.liked.map(x => `${x.name}@${x.qn ? x.qn + ':' + x.q : '-'}`).join(' | '), (r.likeLog || []).filter(e => e.action === '빼기').length, finalQueryOf(r), r.liked.map(x => x.name).join('|'), r.final ? r.final.name : '', r.final ? r.liked.findIndex(x => x.id === r.final.id) + 1 : '',
     // 아래는 2026-10-27.2부터. 이전 버전 기록은 빈칸
-    ...(st => [r.appVersion || '', r.poolVer || '', ...(st ? [st.total, st.inView, st.unique, st.uniqView, st.previews, st.dwell, st.padded] : ['','','','','','',''])])(impStats(r))]);
+    ...(st => [r.appVersion || '', r.poolVer || '', ...(st ? [st.total, st.inView, st.unique, st.uniqView, st.previews, st.dwell, st.padded] : ['','','','','','',''])])(impStats(r)),
+    zeroHitQs(r).join(' | ')]);
   return [head.join(','), ...rows.map(r => r.map(cell).join(','))].join('\n');
 }
 // 노출 한 건 = 한 줄 (검색 결과에 그린 사진 한 장, 또는 크게 보기 한 번). 이전 버전 기록은 줄이 없다
@@ -1394,6 +1554,7 @@ function sheetRows(r){
   Object.assign(g, st ? {impressions_total: st.total, impressions_in_viewport: st.inView, unique_photos_seen: st.unique, unique_photos_in_viewport: st.uniqView, previews_count: st.previews, padded_queries: st.padded}
     : {impressions_total: '', impressions_in_viewport: '', unique_photos_seen: '', unique_photos_in_viewport: '', previews_count: '', padded_queries: ''});
   Object.assign(g, {app_version: r.appVersion || '', pool_ver: r.poolVer || ''});
+  g.zero_hit_queries = zeroHitQs(r).join(' | '); // 2026-10-27.6부터. 시트 "검색 기록" 탭 AD1 머리글 zero_hit_queries
   const likes = (r.likeLog || []).map((e, i) => [r.researcher || '', r.label || '', i + 1, e.action || '', e.name || refOf(e.id).name, e.qn ?? '', e.q ?? '', e.where || '', e.at || '']);
   return {
     '기록': {columns: Object.keys(g), values: [Object.values(g)]},
