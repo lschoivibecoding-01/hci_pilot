@@ -208,10 +208,11 @@ const TARGETS = [
   {id:'lamp', name:'스탠드 조명', kw:['스탠드','램프','무드등','lamp']},
   {id:'art', name:'벽 그림', kw:['그림','액자','포스터','art','poster','painting','frame']},
   {id:'warm', name:'따뜻한 조명', kw:['간접조명','전구색','노란조명','warm light']},
-  {id:'bedding', name:'겹친 침구', kw:['호텔침구','쿠션','블랭킷','throw','pillows']}
+  {id:'bedding', name:'겹친 침구·담요', kw:['담요','블랭킷','스로우','베드러너','보조이불','호텔침구','blanket','throw']}
 ];
 // 방 종류(침실·원룸 등)는 태그로 달지 않는다: 그런 검색어로는 결과가 걸러지지 않게 하기 위함
-// 타깃 요소(식물·러그·액자·스탠드·따뜻한조명)도 태그로 단다. 비율 조정용 표시는 contains에 따로 둔다
+// 타깃 요소(식물·러그·액자·스탠드·담요)도 태그로 단다. 비율 조정용 표시는 contains에 따로 둔다
+// 따뜻한조명은 예전 타깃 요소였고, 지금은 일반 조명 태그로만 쓴다
 const TAG_GROUPS = [
   {name:'분위기', tags:['아늑한','차분한','따뜻한','시원한','활기찬','몽환적','고급스러운']},
   {name:'스타일', tags:['모던','미니멀','북유럽','내추럴','빈티지','미드센추리','보헤미안','재패니즈','호텔','인더스트리얼','앤틱']},
@@ -222,7 +223,7 @@ const TAG_GROUPS = [
   {name:'가구', tags:['책상','테이블','소파','수납장','책장','옷장','행거','화장대','거울','커튼','블라인드','TV']},
   {name:'침대', tags:['바닥매트리스','저상형','수납침대','헤드보드']},
   {name:'조명', tags:['스탠드','따뜻한조명','펜던트','종이조명','줄조명']},
-  {name:'소품·장식', tags:['식물','러그','액자','사진벽','꽃','인형','책','시계','빔프로젝터','턴테이블']},
+  {name:'소품·장식', tags:['식물','러그','담요','액자','사진벽','꽃','인형','책','시계','빔프로젝터','턴테이블']},
   {name:'생활감', tags:['깔끔한','생활감','맥시멀']},
   {name:'공간·전망', tags:['넓은','좁은','큰창문','다락','복층','높은천장','곡선','시티뷰','산뷰']},
   {name:'반려동물', tags:['고양이','강아지']}
@@ -247,7 +248,7 @@ const SYN = {
   '바닥매트리스':['floor mattress','mattress','매트리스','바닥'],'저상형':['low bed','platform bed','저상형침대','낮은','낮은침대'],'수납침대':['storage bed','서랍침대'],'헤드보드':['headboard','침대헤드'],
   '스탠드':['lamp','floor lamp','table lamp','램프','무드등','스탠드조명'],'따뜻한조명':['warm light','간접조명','전구색','노란조명','조명'],'펜던트':['pendant','천장조명','펜던트조명'],
   '종이조명':['paper lamp','paper lantern','한지','한지조명'],'줄조명':['fairy lights','string lights','전구','알전구','가랜드'],
-  '식물':['plant','plants','greenery','화분','플랜테리어','몬스테라'],'러그':['rug','carpet','카펫'],'액자':['art','poster','painting','frame','그림','포스터','패브릭포스터','벽그림'],
+  '식물':['plant','plants','greenery','화분','플랜테리어','몬스테라'],'러그':['rug','carpet','카펫'],'담요':['blanket','throw','bed runner','블랭킷','스로우','베드러너','보조이불','겹친침구','호텔침구'],'액자':['art','poster','painting','frame','그림','포스터','패브릭포스터','벽그림'],
   '사진벽':['photo wall','gallery wall','사진'],'꽃':['flower','flowers','꽃병','화병'],'인형':['doll','plush','teddy','곰인형'],'책':['books','book','독서'],'시계':['clock','벽시계'],
   '빔프로젝터':['projector','빔','프로젝터'],'턴테이블':['turntable','record player','레코드','lp','음악'],
   '깔끔한':['clean','tidy','neat','정돈','정돈된'],'생활감':['lived-in','messy','현실','현실적'],'맥시멀':['maximal','maximalist','아기자기'],
@@ -281,7 +282,7 @@ const S = {
   selected: new Set(),
   filter: 'all',
   tab: 'pool',
-  settings: Object.assign({targets:['plant','rug','lamp','art','warm'], taskMin:15, minCand:4}, LS.get('rs_settings', {})),
+  settings: Object.assign({targets:['plant','rug','lamp','art','bedding'], taskMin:15, minCand:4}, LS.get('rs_settings', {})),
   sessions: LS.get('rs_sessions', []),
   session: null,
   results: [], resultLimit: 24, lastQuery: '', resultMeta: null

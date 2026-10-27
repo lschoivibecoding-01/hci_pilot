@@ -24,7 +24,7 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAX_EDGE = 1600
 # search_system.html의 TARGETS 이름. 짧게 적어도 받아 준다
 # 타깃 요소 태그 → search_system.html의 TARGETS 이름. contains 칸은 태그에서 자동으로 채운다
-TARGET_NAMES = {'식물': '식물', '러그': '러그', '스탠드': '스탠드 조명', '액자': '벽 그림', '따뜻한조명': '따뜻한 조명'}
+TARGET_NAMES = {'식물': '식물', '러그': '러그', '스탠드': '스탠드 조명', '액자': '벽 그림', '담요': '겹친 침구·담요'}
 
 
 def nfc(s):
