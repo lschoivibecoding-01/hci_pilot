@@ -163,9 +163,30 @@ a.btn{text-decoration:none;display:inline-block}
 .g-like-btn.on{background:var(--accent);color:var(--accent-ink)}
 .g-confirm{max-width:720px}
 .g-confirm h2{font-size:22px}
-.g-done{display:flex;flex-direction:column;align-items:center;gap:14px;padding-block:40px;text-align:center}
-.g-done img{max-width:min(960px,100%);border-radius:12px;display:block}
-.g-done h1{font-size:26px}
+/* 크게 보기·결정 확인: 버튼 줄을 사진 위에 두고, 사진은 화면 안에 다 들어오게 줄인다 (세로 사진도 원본 전체) */
+.modal .panel.pv{max-width:1200px;overflow:hidden}
+.modal .panel.pv>img,.modal .panel.g-confirm>img{width:auto;height:auto;max-width:100%;max-height:calc(100vh - 140px);max-height:calc(100dvh - 140px);object-fit:contain;margin:0 auto;background:var(--sunk)}
+.modal .panel.g-confirm>img{max-height:calc(100vh - 230px);max-height:calc(100dvh - 230px)}
+.pv-bar{flex-wrap:nowrap}
+.pv-bar .btn,.pv-bar .g-like-btn{padding-inline:12px}
+@media (max-width:520px){.modal{padding:8px}.modal .panel{padding:10px;gap:8px}.pv-bar{gap:6px}.pv-bar .row{gap:6px;flex-wrap:nowrap}.pv-bar .btn.sm{padding:5px 8px}.pv-bar .g-like-btn{padding:8px 12px}
+  .modal .panel.pv>img{max-height:calc(100vh - 90px);max-height:calc(100dvh - 90px)}.modal .panel.g-confirm>img{max-height:calc(100dvh - 200px)}}
+.g-done{display:flex;flex-direction:column;align-items:center;gap:10px;padding-block:20px 8px;text-align:center}
+.g-done img{max-width:min(960px,100%);max-height:60vh;max-height:60dvh;width:auto;height:auto;object-fit:contain;border-radius:12px;display:block}
+.g-done h1{font-size:22px}
+.g-call{font-size:28px;font-weight:700;margin-top:8px}
+.g-next{margin-top:18px;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;opacity:.75}
+.g-next:hover{opacity:1;color:var(--ink)}
+/* 과제 안내 한 줄 (홈: 검색창 위, 결과 화면: 위 검색창 아래 작게) */
+.g-task{color:var(--muted);font-size:16px;text-align:center;max-width:640px;margin:0}
+.g-task.sm{flex-basis:100%;font-size:13px;text-align:left;margin-top:-10px}
+/* 담은 사진이 있으면 아래에 고르러 가는 줄 */
+.g-finish{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;justify-content:center;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -2px 10px rgba(0,0,0,.06)}
+.g-finish .g-btn{font-size:16px;padding:11px 26px}
+body.has-finish #main{padding-bottom:72px}
+/* 연구자 화면: 진행 중 참여자 경과 */
+.live{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.live-over{display:inline-flex;align-items:center;gap:6px;background:var(--research-soft);color:var(--research);border:1px solid var(--research);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700}
 .g-exit{margin-top:24px;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:7px 16px;font-size:13px;cursor:pointer}
 .g-exit:hover{color:var(--ink);border-color:var(--muted)}
 .g-notify{border:0;background:none;padding:6px 10px;color:var(--muted);font:inherit;cursor:pointer;border-radius:6px}
@@ -258,6 +279,10 @@ const SYN = {
   '고양이':['cat','cats','반려동물','pet','반려묘'],'강아지':['dog','puppy','개','반려동물','pet','반려견']
 };
 const MAX_EDGE = 1600, THUMB_EDGE = 420;
+// 앱 버전: 기록마다 붙는다. 화면·기록 방식을 바꾸면 날짜와 순번을 올린다
+const APP_VERSION = '2026-10-27.2';
+// 참여자 화면의 과제 안내 한 줄 (검색 그룹 진행 대본의 과제 문장 + 하트 안내)
+const TASK_LINE = '다음에 혼자 지낼 방으로 가장 마음에 드는 방을 정해 주세요. 마음에 드는 사진은 하트를 눌러 담아 주세요.';
 
 /* ================= 저장소 ================= */
 const DB = (() => {
@@ -267,6 +292,7 @@ const DB = (() => {
   return {
     all: () => tx('readonly', st => st.getAll()),
     put: rec => tx('readwrite', st => st.put(rec)).finally(poolPing),
+    putQuiet: rec => tx('readwrite', st => st.put(rec)), // 신호 없이 저장 (여러 장을 고친 뒤 한 번만 알린다)
     del: id => tx('readwrite', st => st.delete(id)).finally(poolPing),
     clear: () => tx('readwrite', st => st.clear()).finally(poolPing)
   };
@@ -285,7 +311,7 @@ const S = {
   settings: Object.assign({targets:['plant','rug','lamp','art','bedding'], taskMin:15, minCand:4}, LS.get('rs_settings', {})),
   sessions: LS.get('rs_sessions', []),
   session: null,
-  results: [], resultLimit: 24, lastQuery: '', resultMeta: null
+  results: [], resultLimit: 30, lastQuery: '', resultMeta: null, owner: {}, pvIdx: null, nextSource: null
 };
 const saveSettings = () => LS.set('rs_settings', S.settings);
 const saveSessions = () => LS.set('rs_sessions', S.sessions);
@@ -330,6 +356,19 @@ function urlFor(p, kind){
   return S.urls[p.id][kind];
 }
 async function loadPhotos(){ S.photos = ((await DB.all()) || []).sort((a,b) => a.addedAt - b.addedAt); }
+// 사진마다 가로/세로 비율(ar = width / height)을 원본(blob)에서 한 번 재서 저장한다. 노출 CSV에 들어간다
+async function ensureAspect(){
+  if (typeof createImageBitmap === 'undefined') return;
+  const need = S.photos.filter(p => !(p.ar > 0) && (p.blob || p.thumb));
+  let n = 0;
+  for (const p of need){
+    const bmp = await createImageBitmap(p.blob || p.thumb).catch(() => null);
+    if (!bmp || !bmp.height) continue;
+    p.ar = Math.round(bmp.width / bmp.height * 10000) / 10000; if (bmp.close) bmp.close();
+    await DB.putQuiet(p); n++;
+  }
+  if (n) poolPing();
+}
 
 /* ================= 검색 색인 ================= */
 function searchIndex(p){
@@ -383,18 +422,9 @@ function render(){
   if (RESEARCH_PAGE) S.mode = null; // 연구자 창은 진행 상태를 쓰지 않는다 (검색 창의 최신 상태를 덮어쓰지 않게)
   else { P.active = S.mode === 'search'; savePick(); }
   if (S.mode === 'search') return renderSearchUI();
-  document.body.classList.remove('search-mode');
+  document.body.classList.remove('search-mode', 'has-finish');
   $('#brand').textContent = '방 사진 검색 · 연구자';
-  const inProgress = !!P.pid && !P.final;
-  $('#topright').innerHTML = RESEARCH_PAGE
-    ? `<div class="row">${inProgress ? `<span class="small muted">검색 화면 진행 중 <b>${esc(P.pid)}</b> · 담은 사진 ${P.liked.length}장</span><button class="btn sm danger" id="abort" type="button">미완료로 끝내기</button>` : ''}<a class="btn primary sm" href="?view=search" target="_blank" rel="noopener">검색 화면 열기 ↗</a></div>`
-    : `<div class="row">${inProgress ? `<button class="btn sm" id="resume" type="button">${esc(P.pid)} 이어서 진행</button>` : ''}<button class="btn primary sm" id="open-search" type="button">새 참여자 시작</button></div>`;
-  const os = $('#open-search'); if (os) os.onclick = askParticipantId;
-  const rs = $('#resume'); if (rs) rs.onclick = () => { S.mode = 'search'; render(); };
-  const ab = $('#abort'); if (ab) ab.onclick = () => {
-    if (!ab.dataset.sure){ ab.dataset.sure = 1; ab.textContent = '한 번 더 누르면 끝내기'; setTimeout(() => { if (ab.isConnected){ delete ab.dataset.sure; ab.textContent = '미완료로 끝내기'; } }, 4000); return; }
-    reloadPick(); resetSession(); render();
-  };
+  renderTopRight();
   const tab = S.rtab || 'pool';
   $('#main').innerHTML = `<div class="stack"><div class="research-strip">${RESEARCH_PAGE ? '연구자 화면 · 참여자는 "검색 화면 열기"로 연 창에서 진행합니다. 기록은 이 화면에 자동으로 쌓입니다' : '연구자 화면 · "새 참여자 시작"에서 참여자 ID를 넣으면 검색 화면으로 넘어갑니다'}</div>
     <div class="tabs" role="tablist"><button role="tab" data-rtab="pool" aria-selected="${tab==='pool'}">사진 풀 관리</button><button role="tab" data-rtab="archive" aria-selected="${tab==='archive'}">참여자 기록 <span class="mono">${ARCH.length}</span></button></div>
@@ -402,6 +432,31 @@ function render(){
   $$('[data-rtab]').forEach(b => b.onclick = () => { S.rtab = b.dataset.rtab; render(); });
   if (tab === 'archive') renderArchive(); else renderPool();
 }
+
+// 연구자 화면 오른쪽 위: 진행 중인 참여자, 경과 시간(1초마다 갱신), 검색·담기·노출 수, 15분 지나면 진행자용 알림
+const OVER_MIN = 15;
+function renderTopRight(){
+  const inProgress = !!P.pid && !P.final;
+  $('#topright').innerHTML = RESEARCH_PAGE
+    ? `<div class="row">${inProgress ? `<span class="small muted">검색 화면 진행 중 <b>${esc(P.pid)}</b> · <span class="live" id="live"></span></span><span class="live-over" id="live-over" hidden></span><button class="btn sm danger" id="abort" type="button">미완료로 끝내기</button>` : ''}<a class="btn primary sm" href="?view=search" target="_blank" rel="noopener">검색 화면 열기 ↗</a></div>`
+    : `<div class="row">${inProgress ? `<span class="small muted live" id="live"></span><span class="live-over" id="live-over" hidden></span><button class="btn sm" id="resume" type="button">${esc(P.pid)} 이어서 진행</button>` : ''}<button class="btn primary sm" id="open-search" type="button">새 참여자 시작</button></div>`;
+  const os = $('#open-search'); if (os) os.onclick = askParticipantId;
+  const rs = $('#resume'); if (rs) rs.onclick = () => { S.mode = 'search'; render(); };
+  const ab = $('#abort'); if (ab) ab.onclick = () => {
+    if (!ab.dataset.sure){ ab.dataset.sure = 1; ab.textContent = '한 번 더 누르면 끝내기'; setTimeout(() => { if (ab.isConnected){ delete ab.dataset.sure; ab.textContent = '미완료로 끝내기'; } }, 4000); return; }
+    reloadPick(); resetSession(); render();
+  };
+  updateLive();
+}
+function updateLive(){
+  const el = $('#live'); if (!el) return;
+  const now = Date.now(), t0 = P.sessionAt || P.startedAt, t1 = P.startedAt;
+  const imp = (P.shows || []).reduce((a, e) => a + e.ids.length, 0);
+  el.textContent = `시작 후 ${t0 ? fmt(now - Date.parse(t0)) : '—'} · 첫 검색 후 ${t1 ? fmt(now - Date.parse(t1)) : '—'} · 검색 ${(P.queries || []).length} · 담은 사진 ${P.liked.length} · 노출 ${imp} · 크게 보기 ${(P.previews || []).length}`;
+  const base = t1 || t0, over = base && now - Date.parse(base) >= OVER_MIN * 60000;
+  const o = $('#live-over'); if (o){ o.hidden = !over; o.textContent = `${OVER_MIN}분 지남 · 진행자 확인`; }
+}
+setInterval(() => { if (S.mode !== 'search') updateLive(); }, 1000);
 
 /* ---------- 사진 풀 관리 ---------- */
 function renderPool(){
@@ -565,6 +620,7 @@ async function addFiles(fileList, meta){
     await DB.put(rec); S.photos.push(rec); existing.add(nfc(f.name)); added++;
     if (prog) prog.firstElementChild.style.width = ((i+1)/imgs.length*100) + '%';
   }
+  ensureAspect();
   toast(`${added}장 추가${skipped ? ` · 같은 이름 ${skipped}장 건너뜀` : ''}${failed ? ` · 읽지 못한 파일 ${failed}장 (HEIC는 JPG로 바꿔 주세요)` : ''}`);
   renderPool();
 }
@@ -657,21 +713,70 @@ async function syncDefaultPool(force){
 
 /* ---------- 참여자 검색 화면 ---------- */
 const photoById = id => S.photos.find(p => p.id === id);
-// 참여자 진행 상태: 마음에 든 사진, 최종 사진, 지금 보는 화면 (새로고침해도 유지)
+// 참여자 진행 상태: 마음에 든 사진, 최종 사진, 지금 보는 화면, 마지막 검색어, 노출 기록 (새로고침해도 유지)
 const PICK_KEY = 'rs_pick';
 const pickDefault = () => ({liked: [], final: null, view: 'search', startedAt: null, finishedAt: null});
 const P = Object.assign(pickDefault(), LS.get(PICK_KEY, {}));
-const savePick = () => LS.set(PICK_KEY, P);
+let pickTimer = null;
+const savePick = () => { clearTimeout(pickTimer); pickTimer = null; LS.set(PICK_KEY, P); };
+const savePickSoon = () => { if (!pickTimer) pickTimer = setTimeout(savePick, 400); }; // 스크롤 중 자주 바뀌는 값(화면에 보인 시각)용
 const reloadPick = () => { Object.keys(P).forEach(k => delete P[k]); Object.assign(P, pickDefault(), LS.get(PICK_KEY, {})); };
 const isLiked = id => P.liked.includes(id);
+const nowIso = () => new Date().toISOString();
+const curQ = () => { const qs = P.queries || [], qn = qs.length; return {qn, q: qn ? qs[qn - 1].q : ''}; };
+
+/* 노출 기록: 화면에 실제로 그린 사진을 검색마다 남긴다
+   P.shows[]    = {n, qn, q, at, source, from, ids[], padded, hits, total, vis{id: 처음 반 이상 보인 때까지 ms}}
+     source: search(검색) · more(결과 더 보기, 새로 붙은 사진만) · return(모아 보기에서 돌아옴) · reload(새로고침 뒤 복원) · rerender(그 밖에 다시 그림)
+     from: 이 묶음 첫 사진의 순위(1부터). 순위 = from + ids 안 위치
+   P.previews[] = {id, qn, q, openedAt, dwellMs, via(click|key|button), from(search|saved), rank} */
+function logShow(source, list, from){
+  if (P.final || !list.length) return null;
+  const {qn, q} = curQ(), m = S.resultMeta || {};
+  const e = {n: (P.shows || []).length + 1, qn, q, at: nowIso(), source, from, ids: list.map(p => p.id), padded: !!m.padded, hits: m.hits ?? null, total: S.results.length, vis: {}, sz: {}, vw: window.innerWidth, vh: window.innerHeight};
+  (P.shows = P.shows || []).push(e); savePick(); return e;
+}
+// 그린 칸의 실제 크기(px, [너비, 높이])를 그 사진을 처음 그린 묶음에 적는다 (면적으로 가중한 노출 계산용)
+function measureTiles(box){
+  if (!box.isConnected) return; let ch = false;
+  $$('.g-item', box).forEach(t => { const e = (P.shows || [])[(S.owner[t.dataset.id] || 0) - 1]; if (!e || !e.sz) return; const r = t.getBoundingClientRect(), v = [Math.round(r.width), Math.round(r.height)], o = e.sz[t.dataset.id]; if (!o || o[0] !== v[0] || o[1] !== v[1]){ e.sz[t.dataset.id] = v; ch = true; } });
+  if (ch) savePickSoon();
+}
+let IO = null;
+function observeTiles(box){
+  if (IO) IO.disconnect();
+  if (!('IntersectionObserver' in window)) return;
+  IO = new IntersectionObserver(ents => {
+    ents.forEach(en => {
+      if (!en.isIntersecting) return;
+      const id = en.target.dataset.id, e = (P.shows || [])[(S.owner[id] || 0) - 1];
+      if (e && e.vis && e.vis[id] == null){ e.vis[id] = Math.max(0, Date.now() - Date.parse(e.at)); savePickSoon(); }
+      IO.unobserve(en.target);
+    });
+  }, {threshold: .5});
+  $$('.g-item', box).forEach(t => IO.observe(t));
+}
+function pvOpen(id, via, from, rank){
+  if (P.final) return;
+  const {qn, q} = curQ();
+  (P.previews = P.previews || []).push({id, qn, q, openedAt: nowIso(), dwellMs: null, via, from, rank});
+  S.pvIdx = P.previews.length - 1; savePick();
+}
+function pvClose(){
+  if (S.pvIdx == null) return;
+  const e = (P.previews || [])[S.pvIdx]; S.pvIdx = null;
+  if (e && e.dwellMs == null){ e.dwellMs = Math.max(0, Date.now() - Date.parse(e.openedAt)); savePick(); }
+}
+window.addEventListener('pagehide', () => { pvClose(); if (pickTimer) savePick(); });
+
 function toggleLike(id){
   if (P.final) return;
   const i = P.liked.indexOf(id);
-  const qs = P.queries || [], qn = qs.length;
+  const {qn, q} = curQ();
   const where = P.view === 'saved' ? '모아 보기' : (document.querySelector('.modal') ? '크게 보기' : '검색 결과');
-  (P.likeLog = P.likeLog || []).push({action: i >= 0 ? '빼기' : '담기', id, at: new Date().toISOString(), qn, q: qn ? qs[qn - 1].q : '', where});
+  (P.likeLog = P.likeLog || []).push({action: i >= 0 ? '빼기' : '담기', id, at: nowIso(), qn, q, where});
   if (i >= 0) P.liked.splice(i, 1); else P.liked.push(id);
-  if (!P.startedAt) P.startedAt = new Date().toISOString();
+  if (!P.startedAt) P.startedAt = nowIso();
   savePick(); syncLikes();
 }
 const HEART = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.5 8.1 3.6 5 6.8 5c2 0 3.4 1.1 4.2 2.4h2C13.8 6.1 15.2 5 17.2 5c3.2 0 5.3 3.1 4.1 6.3-1.8 4.6-9.3 9.2-9.3 9.2z" fill="currentColor"/></svg>';
@@ -680,49 +785,86 @@ function syncLikes(){
   $$('.g-saved-count').forEach(n => n.textContent = P.liked.length);
   $$('.g-saved').forEach(n => n.classList.toggle('has', P.liked.length > 0));
   $$('[data-like-label]').forEach(n => n.textContent = isLiked(n.dataset.likeLabel) ? '마음에 든 사진에 담김' : '마음에 들어요');
+  syncFinishBar();
 }
+// 검색 화면 아래 고정 줄: 담은 사진이 1장 이상이면 "한 장 고르러 가기". 장수 제한·시간 표시는 없다
+function syncFinishBar(){
+  const on = S.mode === 'search' && !P.final && P.view !== 'saved' && P.liked.length > 0 && !!$('#gform');
+  let bar = $('#finish-bar');
+  if (!on){ if (bar) bar.remove(); document.body.classList.remove('has-finish'); return; }
+  if (!bar){
+    bar = document.createElement('div'); bar.className = 'g-finish'; bar.id = 'finish-bar';
+    bar.innerHTML = '<button class="g-btn" type="button" id="finish-go"></button>';
+    document.body.appendChild(bar);
+    $('#finish-go', bar).onclick = goSaved;
+  }
+  $('#finish-go', bar).textContent = `담은 사진 ${P.liked.length}장 · 한 장 고르러 가기 →`;
+  document.body.classList.add('has-finish');
+}
+const goSaved = () => { P.view = 'saved'; P._sel = null; savePick(); renderSearchUI(); window.scrollTo(0,0); };
 const savedBtn = () => `<button class="g-saved ${P.liked.length ? 'has' : ''}" id="to-saved" type="button">${HEART}<span>마음에 든 사진</span><b class="g-saved-count">${P.liked.length}</b></button>`;
-function tile(p, mode){
-  return `<div class="g-item${mode==='pick' && P._sel===p.id ? ' sel' : ''}" data-id="${p.id}">
+function tile(p, mode, rank){
+  return `<div class="g-item${mode==='pick' && P._sel===p.id ? ' sel' : ''}" data-id="${p.id}"${rank ? ` data-rank="${rank}"` : ''}>
     <button class="g-open" type="button" aria-label="${mode==='pick' ? '이 사진 고르기' : '크게 보기'}"><img loading="lazy" alt="방 사진" src="${urlFor(p,'thumb')}"></button>
     ${mode==='pick' ? `<button class="g-zoom" type="button" data-zoom="${p.id}" aria-label="크게 보기"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M10.5 4a6.5 6.5 0 0 1 5.2 10.4l4.4 4.4-1.4 1.4-4.4-4.4A6.5 6.5 0 1 1 10.5 4zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z" fill="currentColor"/></svg></button><span class="g-check" aria-hidden="true">✓</span>` : ''}
     <button class="g-like${isLiked(p.id) ? ' on' : ''}" type="button" data-like="${p.id}" aria-pressed="${isLiked(p.id)}">${HEART}</button>
   </div>`;
 }
-function fitTiles(box){
-  $$('.g-item', box).forEach(t => { const img = t.querySelector('img'); const fit = () => { if (img.naturalWidth) t.style.flexBasis = Math.round(190 * img.naturalWidth / img.naturalHeight) + 'px'; }; img.complete ? fit() : img.addEventListener('load', fit); });
+// 사진 비율대로 칸 너비를 맞춘다 (자르지 않고 원래 비율 유지). 다 맞춘 뒤 onSettle로 칸 크기를 잰다
+function fitTiles(box, onSettle){
+  let t = null; const settle = () => { if (!onSettle) return; clearTimeout(t); t = setTimeout(onSettle, 250); };
+  $$('.g-item', box).forEach(tl => { const img = tl.querySelector('img'); const fit = () => { if (img.naturalWidth) tl.style.flexBasis = Math.round(tl.offsetHeight * img.naturalWidth / img.naturalHeight || 190 * img.naturalWidth / img.naturalHeight) + 'px'; settle(); }; img.complete ? fit() : img.addEventListener('load', fit); });
+  settle();
 }
 function bindLikeButtons(root){ $$('[data-like]', root).forEach(b => b.onclick = e => { e.stopPropagation(); toggleLike(b.dataset.like); if (P.view === 'saved') renderSearchUI(); }); }
+// 검색 실행 (같은 검색어·시드면 늘 같은 결과라 새로고침 뒤에도 그대로 복원된다)
+function doSearch(q){ const r = runSearch(q, 'pilot'); S.lastQuery = q; S.results = r.list; S.resultMeta = {hits: r.hits, padded: r.padded}; return r; }
 
 function renderSearchUI(){
   document.body.classList.add('search-mode');
   $('#brand').textContent = ''; $('#topright').innerHTML = '';
-  if (SEARCH_PAGE && (!P.pid || S.nextUp)) return renderStartUI();
-  if (P.final) return renderDoneUI();
-  if (P.view === 'saved') return renderSavedUI();
+  if (IO){ IO.disconnect(); IO = null; }
+  const finishRender = () => syncFinishBar();
+  if (SEARCH_PAGE && (!P.pid || S.nextUp)){ renderStartUI(); return finishRender(); }
+  if (P.final){ renderDoneUI(); return finishRender(); }
+  if (P.view === 'saved'){ renderSavedUI(); return finishRender(); }
+  const source = S.nextSource || 'rerender'; S.nextSource = null;
   if (!S.lastQuery){
     $('#main').innerHTML = `<div class="g-bar g-bar-home">${savedBtn()}</div><div class="g-home">
+      <p class="g-task">${esc(TASK_LINE)}</p>
       <form class="g-form" id="gform" role="search"><input type="search" id="q" aria-label="검색어" autocomplete="off"><button class="g-btn">검색</button></form></div>`;
   } else {
     $('#main').innerHTML = `<div class="g-top">
-      <form class="g-form" id="gform" role="search"><input type="search" id="q" aria-label="검색어" autocomplete="off" value="${esc(S.lastQuery)}"><button class="g-btn">검색</button></form>${savedBtn()}</div>
+      <form class="g-form" id="gform" role="search"><input type="search" id="q" aria-label="검색어" autocomplete="off" value="${esc(S.lastQuery)}"><button class="g-btn">검색</button></form>${savedBtn()}
+      <p class="g-task sm">${esc(TASK_LINE)}</p></div>
       <div class="g-grid" id="results"></div>
       <div class="row" style="justify-content:center;margin-top:20px"><button class="btn" id="more" hidden>결과 더 보기</button></div>`;
-    $('#more').onclick = () => { S.resultLimit += 30; drawResults(); };
-    drawResults();
+    $('#more').onclick = () => { const before = Math.min(S.resultLimit, S.results.length); S.resultLimit += 30; P.resultLimit = S.resultLimit; savePick(); drawResults('more', before); };
+    drawResults(source);
   }
-  $('#to-saved').onclick = () => { P.view = 'saved'; P._sel = null; savePick(); renderSearchUI(); window.scrollTo(0,0); };
-  $('#gform').onsubmit = e => { e.preventDefault(); const q = $('#q').value.trim(); if (!q) return; if (!P.final){ (P.queries = P.queries || []).push({q, at: new Date().toISOString()}); if (!P.startedAt) P.startedAt = new Date().toISOString(); savePick(); } S.lastQuery = q; S.resultLimit = 30; S.results = runSearch(q, 'pilot').list; renderSearchUI(); window.scrollTo(0,0); };
+  $('#to-saved').onclick = goSaved;
+  $('#gform').onsubmit = e => {
+    e.preventDefault(); const q = $('#q').value.trim(); if (!q) return;
+    const r = doSearch(q); S.resultLimit = 30;
+    if (!P.final){ (P.queries = P.queries || []).push({q, at: nowIso(), hits: r.hits, padded: r.padded}); if (!P.startedAt) P.startedAt = nowIso(); P.lastQ = q; P.resultLimit = 30; savePick(); }
+    S.nextSource = 'search'; renderSearchUI(); window.scrollTo(0,0);
+  };
   if (!S.lastQuery) $('#q').focus();
+  finishRender();
 }
-function drawResults(){
+function drawResults(source, before){
   const box = $('#results'); if (!box) return;
   const shown = S.results.slice(0, S.resultLimit);
-  if (!shown.length){ box.innerHTML = '<p class="muted" style="padding:40px 0">검색 결과가 없습니다.</p>'; $('#more').hidden = true; return; }
-  box.innerHTML = shown.map(p => tile(p, 'search')).join('') + '<span class="g-fill"></span>';
-  fitTiles(box); bindLikeButtons(box);
-  $$('.g-item', box).forEach(t => t.querySelector('.g-open').onclick = () => openPreview(t.dataset.id, shown));
+  if (!shown.length){ box.innerHTML = '<p class="muted" style="padding:40px 0;grid-column:1/-1">검색 결과가 없습니다.</p>'; $('#more').hidden = true; return; }
+  box.innerHTML = shown.map((p, i) => tile(p, 'search', i + 1)).join('') + '<span class="g-fill"></span>';
+  // 노출 기록: 결과 더 보기면 새로 붙은 사진만, 그 밖에는 그린 사진 전부를 한 묶음으로
+  if (source === 'more'){ const e = logShow('more', shown.slice(before), before + 1); if (e) e.ids.forEach(id => S.owner[id] = e.n); }
+  else { const e = logShow(source, shown, 1); S.owner = {}; if (e) e.ids.forEach(id => S.owner[id] = e.n); }
+  bindLikeButtons(box);
+  $$('.g-item', box).forEach(t => t.querySelector('.g-open').onclick = () => openPreview(t.dataset.id, shown, false, 'click'));
   $('#more').hidden = S.results.length <= S.resultLimit;
+  fitTiles(box, () => measureTiles(box));
+  observeTiles(box);
 }
 
 function renderSavedUI(){
@@ -735,24 +877,24 @@ function renderSavedUI(){
       <div class="g-grid g-pick" id="saved">${list.map(p => tile(p, 'pick')).join('')}<span class="g-fill"></span></div>
       <div class="g-decide"><span class="muted" id="sel-hint">${P._sel ? '고른 사진: 1장' : '사진을 눌러 한 장을 고르세요'}</span><button class="g-btn" id="decide" type="button" ${P._sel ? '' : 'disabled'}>이 사진으로 결정</button></div>`
     : `<div class="empty">아직 담은 사진이 없어요.<br>검색 결과에서 하트를 눌러 마음에 드는 사진을 담아 보세요.</div>`}`;
-  $('#back').onclick = () => { P.view = 'search'; savePick(); renderSearchUI(); };
+  $('#back').onclick = () => { P.view = 'search'; savePick(); S.nextSource = 'return'; renderSearchUI(); };
   const box = $('#saved'); if (!box) return;
   fitTiles(box); bindLikeButtons(box);
   $$('.g-item', box).forEach(t => {
     t.querySelector('.g-open').onclick = () => { P._sel = t.dataset.id; savePick(); $$('.g-item', box).forEach(x => x.classList.toggle('sel', x === t)); $('#decide').disabled = false; $('#sel-hint').textContent = '고른 사진: 1장'; };
   });
-  $$('[data-zoom]', box).forEach(b => b.onclick = e => { e.stopPropagation(); openPreview(b.dataset.zoom, list, true); });
+  $$('[data-zoom]', box).forEach(b => b.onclick = e => { e.stopPropagation(); openPreview(b.dataset.zoom, list, true, 'click'); });
   $('#decide').onclick = confirmFinal;
 }
 function confirmFinal(){
   const p = photoById(P._sel); if (!p) return;
   const m = document.createElement('div'); m.className = 'modal';
   m.innerHTML = `<div class="panel g-confirm" role="dialog" aria-modal="true" aria-label="최종 선택 확인">
-    <img alt="고른 사진" src="${urlFor(p,'full')}">
-    <h2>이 사진으로 결정할까요?</h2><p class="muted">결정하면 다시 바꿀 수 없어요.</p>
-    <div class="row" style="justify-content:flex-end"><button class="btn" data-close type="button">다시 고르기</button><button class="g-btn" id="ok" type="button">결정</button></div></div>`;
+    <div class="row between"><div><h2>이 사진으로 결정할까요?</h2><p class="muted">결정하면 다시 바꿀 수 없어요.</p></div>
+    <div class="row"><button class="btn" data-close type="button">다시 고르기</button><button class="g-btn" id="ok" type="button">결정</button></div></div>
+    <img alt="고른 사진" src="${urlFor(p,'full')}"></div>`;
   m.onclick = e => { if (e.target === m || e.target.dataset.close != null) m.remove(); };
-  $('#ok', m).onclick = () => { P.final = p.id; P.finishedAt = new Date().toISOString(); archiveCurrent('완료'); savePick(); m.remove(); renderSearchUI(); window.scrollTo(0,0); };
+  $('#ok', m).onclick = () => { P.final = p.id; P.finishedAt = nowIso(); archiveCurrent('완료'); savePick(); m.remove(); renderSearchUI(); window.scrollTo(0,0); };
   document.body.appendChild(m);
 }
 function renderDoneUI(){
@@ -761,7 +903,8 @@ function renderDoneUI(){
     <p class="g-done-kicker">선택을 마쳤습니다</p>
     <h1>다음에 혼자 지낼 방으로 고른 사진</h1>
     ${p ? `<img alt="최종으로 고른 사진" src="${urlFor(p,'full')}">` : '<p class="muted">사진을 찾을 수 없습니다.</p>'}
-    <button class="g-notify" id="to-manager" type="button">연구자에게 알려 주세요.</button></div>`;
+    <p class="g-call">진행자를 불러 주세요.</p>
+    <button class="g-next" id="to-manager" type="button">다음 참여자</button></div>`;
   $('#to-manager').onclick = () => { if (SEARCH_PAGE) S.nextUp = true; else S.mode = null; render(); window.scrollTo(0,0); };
 }
 // 검색 화면 전용 시작 화면: 연구자가 진행자·참여자 ID를 넣고 참여자에게 넘긴다
@@ -775,31 +918,37 @@ function renderStartUI(){
   $('#start-form').onsubmit = e => {
     e.preventDefault(); const id = inp.value.trim(); if (!id){ inp.focus(); return; }
     LS.set(WHO_KEY, $('#who-in').value.trim());
-    resetSession(); P.pid = id; savePick(); S.nextUp = false; renderSearchUI(); window.scrollTo(0,0);
+    resetSession(); P.pid = id; P.sessionAt = nowIso(); savePick(); S.nextUp = false; renderSearchUI(); window.scrollTo(0,0);
   };
 }
 
-function openPreview(id, list, fromSaved){
+// 크게 보기: 버튼 줄이 위, 사진은 화면 안에 원본 전체가 보이게. 열린 시간(dwellMs)과 화살표·버튼 이동을 기록한다
+function openPreview(id, list, fromSaved, via){
   const p = photoById(id); if (!p) return;
   const i = list.findIndex(x => x.id === id);
+  pvOpen(id, via || 'click', fromSaved ? 'saved' : 'search', i + 1);
   const m = document.createElement('div'); m.className = 'modal';
-  m.innerHTML = `<div class="panel" role="dialog" aria-modal="true" aria-label="이미지 크게 보기">
-    <img alt="방 사진" src="${urlFor(p,'full')}">
-    <div class="row between"><div class="row"><button class="btn sm" data-nav="-1" ${i <= 0 ? 'disabled' : ''}>← 이전</button><button class="btn sm" data-nav="1" ${i >= list.length - 1 ? 'disabled' : ''}>다음 →</button></div>
-    <div class="row"><button class="btn" data-close type="button">닫기</button>${fromSaved ? `<button class="g-btn" id="pick-this" type="button">이 사진 고르기</button>` : `<button class="g-like-btn${isLiked(id) ? ' on' : ''}" type="button" data-like="${id}" aria-pressed="${isLiked(id)}">${HEART}<span data-like-label="${id}">${isLiked(id) ? '마음에 든 사진에 담김' : '마음에 들어요'}</span></button>`}</div></div></div>`;
-  const close = () => { m.remove(); document.removeEventListener('keydown', onKey); };
-  const go = d => { const n = list[i + d]; if (n){ close(); openPreview(n.id, list, fromSaved); } };
-  const onKey = e => { if (e.key === 'Escape') close(); if (e.key === 'ArrowRight') go(1); if (e.key === 'ArrowLeft') go(-1); };
+  m.innerHTML = `<div class="panel pv" role="dialog" aria-modal="true" aria-label="이미지 크게 보기">
+    <div class="row between pv-bar"><div class="row"><button class="btn sm" data-nav="-1" ${i <= 0 ? 'disabled' : ''}>← 이전</button><button class="btn sm" data-nav="1" ${i >= list.length - 1 ? 'disabled' : ''}>다음 →</button></div>
+    <div class="row"><button class="btn" data-close type="button">닫기</button>${fromSaved ? `<button class="g-btn" id="pick-this" type="button">이 사진 고르기</button>` : `<button class="g-like-btn${isLiked(id) ? ' on' : ''}" type="button" data-like="${id}" aria-pressed="${isLiked(id)}">${HEART}<span data-like-label="${id}">${isLiked(id) ? '마음에 든 사진에 담김' : '마음에 들어요'}</span></button>`}</div></div>
+    <img alt="방 사진" src="${urlFor(p,'full')}"></div>`;
+  const close = () => { pvClose(); m.remove(); document.removeEventListener('keydown', onKey); };
+  const go = (d, how) => { const n = list[i + d]; if (n){ close(); openPreview(n.id, list, fromSaved, how); } };
+  const onKey = e => { if (e.key === 'Escape') close(); if (e.key === 'ArrowRight') go(1, 'key'); if (e.key === 'ArrowLeft') go(-1, 'key'); };
   m.onclick = e => { if (e.target === m || e.target.dataset.close != null) close(); };
-  $$('[data-nav]', m).forEach(b => b.onclick = () => go(Number(b.dataset.nav)));
+  $$('[data-nav]', m).forEach(b => b.onclick = () => go(Number(b.dataset.nav), 'button'));
   $$('[data-like]', m).forEach(b => b.onclick = () => toggleLike(id));
   const pk = $('#pick-this', m); if (pk) pk.onclick = () => { P._sel = id; savePick(); close(); renderSearchUI(); };
   document.addEventListener('keydown', onKey);
   document.body.appendChild(m);
+  // 크게 보기에서 실제로 그린 사진 크기도 남긴다
+  const img = $('.pv>img', m), idx = S.pvIdx, size = () => { const e = (P.previews || [])[idx]; if (!e || !img.isConnected) return; const r = img.getBoundingClientRect(); Object.assign(e, {w: Math.round(r.width), h: Math.round(r.height), vw: window.innerWidth, vh: window.innerHeight}); savePickSoon(); };
+  img.complete ? size() : img.addEventListener('load', size);
 }
 
 /* 연구자 화면: 최근 참여자 결과 */
-function resetSession(){ if (!P.archivedId && P.liked.length) archiveCurrent('미완료'); P.archivedId = null; P.pid = null; P.queries = []; P.likeLog = []; P.liked = []; P.final = null; P._sel = null; P.view = 'search'; P.startedAt = null; P.finishedAt = null; savePick(); S.lastQuery = ''; S.results = []; }
+// 검색이나 담기를 한 번이라도 했으면 미완료로 남긴다 (담은 사진이 없어도 노출 기록을 잃지 않게)
+function resetSession(){ if (!P.archivedId && (P.liked.length || (P.queries || []).length)) archiveCurrent('미완료'); P.archivedId = null; P.pid = null; P.queries = []; P.likeLog = []; P.liked = []; P.final = null; P._sel = null; P.view = 'search'; P.startedAt = null; P.finishedAt = null; P.sessionAt = null; P.shows = []; P.previews = []; P.lastQ = ''; P.resultLimit = 30; savePick(); S.lastQuery = ''; S.results = []; S.resultMeta = null; S.owner = {}; }
 
 
 function askParticipantId(){
@@ -815,7 +964,7 @@ function askParticipantId(){
   const inp = $('#pid-in', m); inp.focus();
   $('#pid-form', m).onsubmit = e => {
     e.preventDefault(); const id = inp.value.trim(); if (!id){ inp.focus(); return; }
-    resetSession(); P.pid = id; savePick(); m.remove(); S.mode = 'search'; render(); window.scrollTo(0,0);
+    resetSession(); P.pid = id; P.sessionAt = nowIso(); savePick(); m.remove(); S.mode = 'search'; render(); window.scrollTo(0,0);
   };
 }
 
@@ -835,8 +984,29 @@ function archiveCurrent(status){
   const rec = {id: 'a' + Date.now().toString(36), no, label: P.pid || '', researcher: who, note: '', status,
     startedAt: P.startedAt, finishedAt: P.finishedAt || new Date().toISOString(),
     liked: P.liked.map(likedRef), final: P.final ? refOf(P.final) : null, queries: (P.queries || []).slice(),
-    likeLog: (P.likeLog || []).map(e => Object.assign({}, e, {name: refOf(e.id).name}))};
+    likeLog: (P.likeLog || []).map(e => Object.assign({}, e, {name: refOf(e.id).name})),
+    // 2026-10-27.2부터: 앱·사진 풀 버전, 노출 기록, 기록에 나온 사진의 이름·타깃 요소·비율 (풀이 바뀌어도 분석할 수 있게)
+    appVersion: APP_VERSION, poolVer: LS.get('rs_pool_ver', ''), poolSize: S.photos.length, sessionAt: P.sessionAt || null,
+    shows: JSON.parse(JSON.stringify(P.shows || [])), previews: JSON.parse(JSON.stringify(P.previews || []))};
+  rec.photoMeta = photoMetaFor(rec);
   ARCH.push(rec); saveArch(); P.archivedId = rec.id;
+}
+// 기록에 나온 모든 사진(노출·크게 보기·담기·최종)의 {name, contains[], ar}
+function photoMetaFor(r){
+  const ids = new Set([...(r.shows || []).flatMap(e => e.ids), ...(r.previews || []).map(e => e.id), ...(r.liked || []).map(x => x.id), ...(r.final ? [r.final.id] : [])]);
+  const out = {};
+  ids.forEach(id => { const p = photoById(id); out[id] = p ? {name: p.name, contains: (p.contains || []).slice(), ar: p.ar || null} : {name: id, contains: null, ar: null}; });
+  return out;
+}
+// 기록 한 건의 노출 요약 (이전 버전 기록은 shows가 없어 null)
+function impStats(r){
+  if (!Array.isArray(r.shows)) return null;
+  const pv = r.previews || [], seen = new Set([...r.shows.flatMap(e => e.ids), ...pv.map(e => e.id)]);
+  const inView = r.shows.reduce((a, e) => a + Object.keys(e.vis || {}).length, 0);
+  const uniqView = new Set(r.shows.flatMap(e => Object.keys(e.vis || {})));
+  const padded = new Set(r.shows.filter(e => e.padded && e.qn).map(e => e.qn)).size;
+  return {total: r.shows.reduce((a, e) => a + e.ids.length, 0), unique: seen.size, inView, uniqView: uniqView.size, previews: pv.length,
+    dwell: pv.reduce((a, e) => a + (e.dwellMs || 0), 0), padded, events: r.shows.length};
 }
 const fmtTime = iso => { if (!iso) return '—'; const d = new Date(iso); return d.toLocaleDateString('ko-KR', {month:'numeric', day:'numeric'}) + ' ' + d.toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'}); };
 const durMin = r => r.startedAt && r.finishedAt ? Math.max(0, Math.round((Date.parse(r.finishedAt) - Date.parse(r.startedAt)) / 60000)) + '분' : '—';
@@ -864,9 +1034,11 @@ function renderArchive(){
         <div class="row">${r.final && photoById(r.final.id) ? `<a class="btn sm" href="${urlFor(photoById(r.final.id),'full')}" download="P${r.no}_FINAL_${esc(r.final.name.replace(/\.[^.]+$/, ''))}.jpg">최종 사진 저장</a>` : ''}<button class="btn sm danger" data-del="${r.id}" type="button">기록 삭제</button></div>
       </div>
       <dl class="kv"><dt>진행자</dt><dd>${esc(r.researcher || '—')}</dd><dt>${r.status === '완료' ? '결정 시각' : '기록 시각'}</dt><dd class="mono">${fmtTime(r.finishedAt)} (첫 검색부터 ${durMin(r)})</dd>
-        <dt>검색어 (${(r.queries || []).length}회)</dt><dd>${(r.queries || []).length ? `<ol class="q-list">${r.queries.map(x => `<li><span class="mono small muted">${new Date(x.at).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'})}</span> ${esc(x.q)}</li>`).join('')}</ol>` : '—'}</dd>
+        <dt>검색어 (${(r.queries || []).length}회)</dt><dd>${(r.queries || []).length ? `<ol class="q-list">${r.queries.map(x => `<li><span class="mono small muted">${new Date(x.at).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'})}</span> ${esc(x.q)}${x.hits != null ? ` <span class="small muted">· 일치 ${x.hits}장${x.padded ? ' · 나머지 사진으로 채움' : ''}</span>` : ''}</li>`).join('')}</ol>` : '—'}</dd>
+        <dt>노출</dt><dd>${(st => st ? `<span class="mono">${st.total}</span>회 (서로 다른 사진 <span class="mono">${st.unique}</span>장, 화면에 보인 것 <span class="mono">${st.inView}</span>회) · 크게 보기 <span class="mono">${st.previews}</span>회 · 채운 검색 <span class="mono">${st.padded}</span>회` : '<span class="muted">— (이전 버전 기록)</span>')(impStats(r))}</dd>
         <dt>마음에 든 사진</dt><dd class="mono">${r.liked.length}장</dd>
-        <dt>최종 사진</dt><dd class="mono" style="word-break:break-all">${r.final ? esc(r.final.name) : '—'}</dd></dl>
+        <dt>최종 사진</dt><dd class="mono" style="word-break:break-all">${r.final ? esc(r.final.name) : '—'}</dd>
+        <dt>버전</dt><dd class="mono small muted">${esc(r.appVersion || '이전 버전')} · 풀 ${esc(r.poolVer || '—')}${r.poolSize ? ` (${r.poolSize}장)` : ''}</dd></dl>
       <div class="g-strip">${r.liked.map(ref => thumbHTML(ref, r.final && ref.id === r.final.id)).join('') || '<p class="small muted">담은 사진 없음</p>'}</div>
     </div>`).join('') : '<div class="empty card">아직 기록이 없습니다. 참여자가 최종 사진을 고르면 여기에 쌓입니다.</div>'}
   </div>`;
@@ -882,9 +1054,33 @@ function renderArchive(){
 }
 function archiveCSV(recs = ARCH){
   const cell = v => { const x = String(v ?? ''); return /[",\n]/.test(x) ? `"${x.replace(/"/g,'""')}"` : x; };
-  const head = ['no','researcher','participant_id','status','started_at','finished_at','query_count','queries','liked_count','liked_with_query','unliked_count','final_query','liked_files','final_file','final_in_liked_order'];
-  const rows = recs.map(r => [r.no, r.researcher || '', r.label, r.status, r.startedAt || '', r.finishedAt || '', (r.queries || []).length, (r.queries || []).map(x => x.q).join(' | '), r.liked.length, r.liked.map(x => `${x.name}@${x.qn ? x.qn + ':' + x.q : '-'}`).join(' | '), (r.likeLog || []).filter(e => e.action === '빼기').length, (() => { const f = r.final && r.liked.find(x => x.id === r.final.id); return f && f.qn ? `${f.qn}:${f.q}` : ''; })(), r.liked.map(x => x.name).join('|'), r.final ? r.final.name : '', r.final ? r.liked.findIndex(x => x.id === r.final.id) + 1 : '']);
+  const head = ['no','researcher','participant_id','status','started_at','finished_at','query_count','queries','liked_count','liked_with_query','unliked_count','final_query','liked_files','final_file','final_in_liked_order',
+    'app_version','pool_ver','impressions_total','impressions_in_viewport','unique_photos_seen','unique_photos_in_viewport','previews_count','preview_dwell_ms_total','padded_queries'];
+  const rows = recs.map(r => [r.no, r.researcher || '', r.label, r.status, r.startedAt || '', r.finishedAt || '', (r.queries || []).length, (r.queries || []).map(x => x.q).join(' | '), r.liked.length, r.liked.map(x => `${x.name}@${x.qn ? x.qn + ':' + x.q : '-'}`).join(' | '), (r.likeLog || []).filter(e => e.action === '빼기').length, (() => { const f = r.final && r.liked.find(x => x.id === r.final.id); return f && f.qn ? `${f.qn}:${f.q}` : ''; })(), r.liked.map(x => x.name).join('|'), r.final ? r.final.name : '', r.final ? r.liked.findIndex(x => x.id === r.final.id) + 1 : '',
+    // 아래는 2026-10-27.2부터. 이전 버전 기록은 빈칸
+    ...(st => [r.appVersion || '', r.poolVer || '', ...(st ? [st.total, st.inView, st.unique, st.uniqView, st.previews, st.dwell, st.padded] : ['','','','','','',''])])(impStats(r))]);
   return [head.join(','), ...rows.map(r => r.map(cell).join(','))].join('\n');
+}
+// 노출 한 건 = 한 줄 (검색 결과에 그린 사진 한 장, 또는 크게 보기 한 번). 이전 버전 기록은 줄이 없다
+const IMP_TARGETS = ['plant','rug','lamp','art','bedding'];
+function impressionsCSV(recs = ARCH){
+  const cell = v => { const x = String(v ?? ''); return /[",\n]/.test(x) ? `"${x.replace(/"/g,'""')}"` : x; };
+  const head = ['researcher','participant_id','record_no','status','app_version','pool_ver','event_no','query_no','query','source','context','shown_at','photo_id','photo','rank','is_match','padded','hits','in_viewport','first_visible_at','tile_w','tile_h','viewport_w','viewport_h','preview_via','dwell_ms','contains',...IMP_TARGETS.map(t => 'has_' + t),'aspect_ratio','liked_at_end','is_final'];
+  const out = [head.join(',')];
+  for (const r of recs){
+    if (!Array.isArray(r.shows)) continue;
+    const meta = r.photoMeta || {}, liked = new Set((r.liked || []).map(x => x.id)), fin = r.final ? r.final.id : null;
+    const ph = id => { const m = meta[id], p = photoById(id); return {name: (m && m.name) || (p && p.name) || id, contains: (m && m.contains) || (p && p.contains) || [], ar: (m && m.ar) || (p && p.ar) || ''}; };
+    const tail = id => { const x = ph(id); return [x.contains.map(c => (TARGETS.find(t => t.id === c) || {name: c}).name).join(';'), ...IMP_TARGETS.map(t => x.contains.includes(t) ? 1 : 0), x.ar, liked.has(id) ? 1 : 0, id === fin ? 1 : 0]; };
+    const base = [r.researcher || '', r.label, r.no, r.status, r.appVersion || '', r.poolVer || ''];
+    r.shows.forEach(e => e.ids.forEach((id, k) => {
+      const rank = e.from + k, v = e.vis ? e.vis[id] : null, sz = (e.sz || {})[id] || [];
+      out.push([...base, e.n, e.qn, e.q, e.source, 'search', e.at, id, ph(id).name, rank, e.hits != null ? (rank <= e.hits ? 1 : 0) : '', e.padded ? 1 : 0, e.hits ?? '',
+        v != null ? 1 : 0, v != null ? new Date(Date.parse(e.at) + v).toISOString() : '', sz[0] ?? '', sz[1] ?? '', e.vw ?? '', e.vh ?? '', '', '', ...tail(id)].map(cell).join(','));
+    }));
+    (r.previews || []).forEach(e => out.push([...base, '', e.qn, e.q, 'preview', e.from, e.openedAt, e.id, ph(e.id).name, e.rank, '', '', '', '', '', e.w ?? '', e.h ?? '', e.vw ?? '', e.vh ?? '', e.via, e.dwellMs ?? '', ...tail(e.id)].map(cell).join(',')));
+  }
+  return out.join('\n');
 }
 async function exportArchiveZip(){
   if (typeof JSZip === 'undefined'){ toast('ZIP을 만들려면 인터넷 연결이 필요합니다. CSV로 받아 주세요'); return; }
@@ -894,6 +1090,7 @@ async function exportArchiveZip(){
   const recs = archShown();
   zip.file('participants.csv', '﻿' + archiveCSV(recs));
   zip.file('participants.json', JSON.stringify(recs, null, 1));
+  zip.file('impressions.csv', '﻿' + impressionsCSV(recs));
   for (const r of recs){
     const dir = `${r.researcher ? r.researcher.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 20) + '_' : ''}${String(r.no).padStart(2,'0')}${r.label ? '_' + r.label.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 30) : ''}/`;
     for (const ref of r.liked){ const p = photoById(ref.id); if (p) zip.file(dir + (r.final && ref.id === r.final.id ? 'FINAL_' : 'liked_') + ref.name.replace(/\.[^.]+$/, '') + '.jpg', p.blob); }
@@ -961,7 +1158,7 @@ window.addEventListener('storage', e => {
   }
   if (e.key === PICK_KEY){
     reloadPick();
-    if (RESEARCH_PAGE) rerenderResearcher(); // 진행 중 표시 갱신
+    if (RESEARCH_PAGE && S.mode !== 'search') renderTopRight(); // 진행 중 표시만 갱신 (노출 기록이 자주 바뀌어도 화면 전체를 다시 그리지 않게)
     else if (SEARCH_PAGE && !P.pid){ S.nextUp = false; S.lastQuery = ''; render(); } // 연구자 창에서 "미완료로 끝내기"
   }
   if (e.key === 'rs_pool_ping' && !S.syncing){
@@ -971,5 +1168,13 @@ window.addEventListener('storage', e => {
 });
 
 /* ---------- 시작 ---------- */
-(async () => { await loadPhotos(); if (P.active) S.mode = 'search'; render(); if (await syncDefaultPool()) render(); })();
+// 새로고침 뒤에는 마지막 검색 결과를 그대로 다시 보여 준다 (검색어·시드가 같으면 결과도 같다). 노출 기록에는 source=reload로 남는다
+function restoreResults(){ if (P.lastQ && !P.final && !S.lastQuery){ doSearch(P.lastQ); S.resultLimit = P.resultLimit || 30; S.nextSource = 'reload'; } }
+(async () => {
+  await loadPhotos(); if (P.active) S.mode = 'search';
+  if (S.photos.length) restoreResults();
+  render();
+  if (await syncDefaultPool()){ restoreResults(); render(); }
+  ensureAspect();
+})();
 </script>
