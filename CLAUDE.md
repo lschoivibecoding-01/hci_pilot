@@ -14,33 +14,51 @@
 여는 주소에 따라 세 가지로 쓴다. 같은 PC·같은 브라우저면 두 창이 localStorage·IndexedDB를 함께 쓰고 `storage` 이벤트로 서로의 변경을 바로 받는다(기록, 진행 상태, 사진 풀). 기기가 다르면 공유되지 않는다(서버 없음).
 
 - `index.html`: 두 화면으로 가는 링크만 있는 첫 페이지.
-- `search_system.html?view=search` (검색 화면 전용, `SEARCH_PAGE`): 시작 화면(`renderStartUI`)에서 진행자·참여자 ID를 넣고 시작 → 검색 → 완료 화면의 "연구자에게 알려 주세요."를 누르면 다시 시작 화면. 연구자 패널(점 버튼, Ctrl+Shift+R)은 없다.
-- `search_system.html?view=researcher` (연구자 화면 전용, `RESEARCH_PAGE`): 사진 풀 관리·참여자 기록만. `검색 화면 열기 ↗` 링크, 진행 중인 참여자 표시와 `미완료로 끝내기`(두 번 눌러야 함). 이 창은 진행 상태 `P`를 쓰지 않는다(검색 창의 최신 상태를 덮어쓰지 않게).
+- `search_system.html?view=search` (검색 화면 전용, `SEARCH_PAGE`): 시작 화면(`renderStartUI`)에서 진행자·참여자 ID를 넣고 시작 → 검색 → 완료 화면의 작은 `다음 참여자` 버튼(진행자용)을 누르면 다시 시작 화면. 연구자 패널(점 버튼, Ctrl+Shift+R)은 없다.
+- `search_system.html?view=researcher` (연구자 화면 전용, `RESEARCH_PAGE`): 사진 풀 관리·참여자 기록만. `검색 화면 열기 ↗` 링크, 진행 중인 참여자 표시(`renderTopRight`/`updateLive`: 시작 후·첫 검색 후 경과 시간을 1초마다 갱신, 검색·담은 사진·노출·크게 보기 수, 첫 검색 후 15분(`OVER_MIN`)이 지나면 호박색 "15분 지남 · 진행자 확인" 표시)와 `미완료로 끝내기`(두 번 눌러야 함). 진행 상태가 바뀌면 오른쪽 위만 다시 그린다(노출 기록이 자주 저장되므로 화면 전체를 다시 그리지 않음). 이 창은 진행 상태 `P`를 쓰지 않는다(검색 창의 최신 상태를 덮어쓰지 않게).
 - 주소에 `view`가 없으면 아래처럼 한 창에서 둘 다 쓰는 예전 방식.
 
 1. **연구자 화면** (기본)
    - 오른쪽 위 `새 참여자 시작` → 참여자 ID 입력 모달(비우면 진행 안 됨) → 검색 화면. 진행 중인 참여자가 있으면 `P03 이어서 진행` 버튼도 나온다.
    - 탭 `사진 풀 관리`: `기본 풀 다시 맞추기`(http(s)일 때만 보임, 직접 고친 태그를 덮어씀), 사진 추가(드래그/파일/폴더, `pool.csv`를 함께 넣으면 태그 자동 적용), 태그 편집(Ctrl/⌘·Shift 다중 선택), 선택·전체 삭제(두 번 눌러야 삭제, Delete 키 지원), 풀 내보내기·불러오기(ZIP: `pool.csv` + `photos/*.jpg`). `pool.csv` 열은 `file, tags, contains`이고 tags는 `;`로 구분한다.
-   - 탭 `참여자 기록`: 참여자별 카드(ID 수정 가능, 완료/미완료, 검색어 목록, 담은 사진과 각각을 담은 검색, 최종 사진, 다른 PC에서 불러온 기록은 "불러온 기록" 표시), 진행자가 둘 이상이면 진행자별 보기(`S.archWho`), `기록 불러오기 (ZIP)`(`importArchive`: ZIP 안 `participants.json`을 읽어 `id`+`researcher`가 같은 기록은 건너뛰고 `imported: true`로 합침), `기록 + 최종 사진 (ZIP)`(화면에 보이는 기록만: `participants.csv` + `participants.json` + `진행자_순번_ID/` 사진 폴더). CSV 단독 내보내기 버튼은 없앴다(ZIP 안에 있음).
+   - 탭 `참여자 기록`: 참여자별 카드(ID 수정 가능, 완료/미완료, 검색어 목록(맞은 사진 수·채움 여부), 노출 요약, 앱·풀 버전, 담은 사진과 각각을 담은 검색, 최종 사진, 다른 PC에서 불러온 기록은 "불러온 기록" 표시), 진행자가 둘 이상이면 진행자별 보기(`S.archWho`), `기록 불러오기 (ZIP)`(`importArchive`: ZIP 안 `participants.json`을 읽어 `id`+`researcher`가 같은 기록은 건너뛰고 `imported: true`로 합침), `기록 + 최종 사진 (ZIP)`(화면에 보이는 기록만: `participants.csv` + `participants.json` + `impressions.csv` + `진행자_순번_ID/` 사진 폴더). CSV 단독 내보내기 버튼은 없앴다(ZIP 안에 있음).
 2. **참여자 검색 화면** (구글 이미지 검색처럼 검색창만 있음)
-   - 결과 사진의 하트 = "마음에 든 사진"에 담기/빼기. 크게 보기 모달에서도 담을 수 있다.
-   - `마음에 든 사진 N` 버튼 → 모아 보기 → 한 장 선택 → `이 사진으로 결정` → 확인 모달 → 완료 화면.
-   - 완료 화면의 "연구자에게 알려 주세요." 문구를 누르면 연구자 화면으로 돌아간다. 다른 화면에서는 Ctrl+Shift+R 또는 오른쪽 아래 작은 점(연구자 패널)으로 나간다.
-   - 참여자 화면에는 다운로드 버튼이 없고 담기 개수 제한도 없다(둘 다 의도된 것).
+   - 과제 안내 한 줄 `TASK_LINE`: 홈에서는 검색창 위, 결과 화면에서는 위 검색창 아래에 작게 늘 보인다. 문장은 검색 그룹 진행 대본(1026_진행대본_2단계_처치_검색그룹)의 과제 문장 "다음에 혼자 지낼 방으로 가장 마음에 드는 방을 정해 주세요."에 하트 안내를 붙인 것. 예시 검색어·타깃 요소 단어·placeholder는 넣지 않는다.
+   - 결과는 사진 비율대로 칸 너비를 맞춘 줄 배치(`fitTiles`, 높이 190px/좁은 화면 130px). 3:2로 자르지 않는다(세로 사진의 바닥 러그·위쪽 벽 그림이 잘려 타깃 요소 노출이 달라지므로). 다음 디자인 작업에서 원래 비율을 유지하는 masonry로 바뀔 예정.
+   - 결과 사진의 하트 = "마음에 든 사진"에 담기/빼기. 크게 보기 모달에서도 담을 수 있다. 크게 보기(`openPreview`)와 결정 확인(`confirmFinal`)은 버튼 줄이 사진 **위**에 있고, 사진은 `max-height: calc(100dvh - 140px)`·`object-fit: contain`으로 원본 전체가 화면 안에 들어온다(세로 사진도 버튼이 밀려나지 않음).
+   - 담은 사진이 1장 이상이면 화면 아래에 고정 줄 "담은 사진 N장 · 한 장 고르러 가기 →"(`syncFinishBar`)가 뜨고 모아 보기로 간다. 장수 제한·시간 표시는 없다(끝내는 시점은 참여자가 정함).
+   - `마음에 든 사진 N` 버튼이나 아래 고정 줄 → 모아 보기 → 한 장 선택 → `이 사진으로 결정` → 확인 모달 → 완료 화면.
+   - 완료 화면(`renderDoneUI`): 최종 사진(최대 60vh) 아래 큰 글씨 "진행자를 불러 주세요."(버튼 아님), 그 아래 작고 흐린 `다음 참여자` 버튼(진행자용, 예전 "연구자에게 알려 주세요."와 같은 동작). 다른 화면에서는 Ctrl+Shift+R 또는 오른쪽 아래 작은 점(연구자 패널)으로 나간다(`view` 없는 예전 방식일 때만).
+   - 새로고침하면 마지막 검색 결과를 그대로 다시 보여 준다(`P.lastQ`, `P.resultLimit`, `restoreResults`; 같은 검색어·시드면 결과가 같다).
+   - 참여자 화면에는 다운로드 버튼, 담기 개수 제한, 시간 표시가 없다(모두 의도된 것).
 
 ## 상태와 저장소
 
 | 저장소 | 키 | 내용 |
 | --- | --- | --- |
-| IndexedDB | DB `room-search-pool`, store `photos` | 사진 레코드 `{id, name, tags[], contains[], blob, thumb, addedAt, fromPool?}`. blob은 긴 변 1600px JPEG, thumb은 420px. 기본 풀 사진은 `fromPool: true`, id는 `pool_` + 파일 이름 해시라 다시 맞춰도 기록의 사진 참조가 유지된다 |
+| IndexedDB | DB `room-search-pool`, store `photos` | 사진 레코드 `{id, name, tags[], contains[], blob, thumb, addedAt, fromPool?, ar?}`. blob은 긴 변 1600px JPEG, thumb은 420px. `ar`(가로/세로 비율, 소수 4자리)은 `ensureAspect()`가 시작할 때·사진 추가 뒤 blob에서 재서 없는 사진에만 채운다. 기본 풀 사진은 `fromPool: true`, id는 `pool_` + 파일 이름 해시라 다시 맞춰도 기록의 사진 참조가 유지된다 |
 | localStorage | `rs_pool_ver` | 마지막으로 맞춘 `pool/pool.csv`의 해시. 바뀌면 다음 시작 때 태그를 갱신하고 새 사진을 받고, 빠진 기본 풀 사진은 지운다(연구자가 직접 넣은 사진은 그대로) |
-| localStorage | `rs_pick` | 진행 중 참여자 `P`: `{pid, liked[], final, view, active, _sel, startedAt, finishedAt, queries[], likeLog[], archivedId}` |
+| localStorage | `rs_pick` | 진행 중 참여자 `P`: `{pid, liked[], final, view, active, _sel, sessionAt, startedAt, finishedAt, queries[], likeLog[], shows[], previews[], lastQ, resultLimit, archivedId}`. `sessionAt`은 시작 버튼을 누른 때. `shows`·`previews`는 아래 노출 기록 |
 | localStorage | `rs_archive` | 참여자 기록 배열 `ARCH`. 고치기 전에 `reloadArch()`로 다른 창의 최신 기록부터 읽는다 |
 | localStorage | `rs_researcher` | 이 PC의 진행자 이름. 새 기록의 `researcher`, CSV 열, 내보내기 파일 이름에 붙는다 |
 | localStorage | `rs_pool_ping` | IndexedDB를 고칠 때마다 바꾸는 신호. 다른 창이 받아 사진 풀을 다시 읽는다 |
 | localStorage | `rs_settings`, `rs_sessions` | 예전 버전의 흔적. 지금 화면에서는 쓰지 않는다 |
 
 `contains`는 사진에 보이는 타깃 요소(식물·러그·스탠드 조명·벽 그림·겹친 침구·담요)를 **보이면 다** 적은 표시로, 나중에 요소 포함 비율을 맞추는 데 쓴다. 타깃 요소는 태그(`식물·러그·액자·스탠드·담요`)로도 달려 검색되고, room-pool 스킬의 `build_pool.py`가 이 태그에서 `contains`를 자동으로 채운다. 검색에서 빼지는 않는다(`isExcluded = () => false`). 2026-10-27에 다섯째 요소를 `따뜻한 조명`에서 `겹친 침구·담요`로 바꿨다: `따뜻한조명` 태그는 일반 조명 태그로 남아 있고, `담요`는 침대 이불 위에 담요·스로우·베드러너(호텔식 보조 이불)를 한 겹 더 얹거나 접어 둔 사진에만 단다(소파에 걸친 담요, 쿠션만 있는 것은 제외). `TARGETS`의 `warm` 항목은 예전 contains가 남은 사진 때문에 지우지 않았다.
+
+앱 버전 `APP_VERSION`(날짜 + 순번, 예 `2026-10-27.2`)을 기록마다 붙인다. 화면이나 기록 방식을 바꾸면 올린다.
+
+### 노출 기록 (2026-10-27.2부터)
+
+검색 결과에 **실제로 그린** 사진을 묶음(show)으로 남긴다(`logShow`, `drawResults`).
+
+- `shows[]`: `{n, qn, q, at, source, from, ids[], padded, hits, total, vis{}, sz{}, vw, vh}`
+  - `source`: `search`(검색) · `more`(결과 더 보기, 새로 붙은 사진만) · `return`(모아 보기에서 돌아옴) · `reload`(새로고침 뒤 복원) · `rerender`(그 밖에 다시 그림)
+  - `from`: 묶음 첫 사진의 순위(1부터). 사진의 순위 = `from + ids 안 위치`. `rank <= hits`면 검색어에 맞은 사진, 아니면 나머지로 채운 사진(`padded`)
+  - `vis[id]`: 칸이 처음 50% 이상 화면에 들어온 때까지의 ms(`at` 기준, IntersectionObserver). 없으면 그려졌지만 화면에 안 들어옴
+  - `sz[id]`: 그린 칸의 실제 크기 `[너비, 높이]` px(`measureTiles`, 사진이 다 로드되고 칸 너비를 맞춘 뒤 잼). `vw`, `vh`는 그때 창 크기. 면적 가중 노출 계산용. 결과 더 보기로 다시 그리면 앞 묶음 사진의 크기도 최신 배치로 바뀐다
+- `previews[]`: `{id, qn, q, openedAt, dwellMs, via, from, rank, w, h, vw, vh}` — 크게 보기 한 번. `via` = `click` · `key`(←/→) · `button`(이전/다음), `from` = `search` · `saved`, `w/h`는 그린 사진 크기. 닫거나 다른 사진으로 넘기면 `dwellMs`가 채워진다(창을 닫을 때는 `pagehide`에서). 새로고침 중에 열려 있던 것은 `dwellMs: null`
+- 모아 보기 화면과 결정 확인·완료 화면에 나온 사진은 따로 남기지 않는다(이미 담은 사진).
 
 참여자 기록 한 건 (`ARCH[i]`):
 
@@ -51,16 +69,29 @@
   "queries": [{"q": "아늑한 침실", "at": "ISO"}],
   "liked": [{"id": "…", "name": "J11_의현.jpg", "qn": 1, "q": "아늑한 침실", "likedAt": "ISO"}],
   "final": {"id": "…", "name": "J01_연수.jpg"},
-  "likeLog": [{"action": "담기 | 빼기", "id": "…", "name": "…", "at": "ISO", "qn": 2, "q": "야경", "where": "검색 결과 | 크게 보기 | 모아 보기"}]
+  "likeLog": [{"action": "담기 | 빼기", "id": "…", "name": "…", "at": "ISO", "qn": 2, "q": "야경", "where": "검색 결과 | 크게 보기 | 모아 보기"}],
+  "appVersion": "2026-10-27.2", "poolVer": "rs_pool_ver 값", "poolSize": 200, "sessionAt": "ISO (시작 버튼)",
+  "shows": [ … ], "previews": [ … ],
+  "photoMeta": {"pool_…": {"name": "…jpg", "contains": ["plant", "rug"], "ar": 0.6659}}
 }
 ```
 
+- `queries[]`에는 2026-10-27.2부터 `hits`(맞은 사진 수), `padded`(나머지로 채웠는지)도 붙는다.
+- `appVersion`부터 아래 필드는 새 기록에만 있다. 예전 기록(필드 없음)도 그대로 불러오고 화면·CSV에서는 빈칸/"이전 버전 기록"으로 나온다. 고칠 때 이 호환을 깨지 않는다.
+- `photoMeta`는 기록에 나온 모든 사진(노출·크게 보기·담기·최종)의 이름·타깃 요소·비율을 기록 순간 그대로 적어 둔 것(`photoMetaFor`). 풀이 나중에 바뀌어도 노출 분석이 된다.
+
 - 최종 결정 순간 `archiveCurrent('완료')`로 자동 저장된다.
-- 최종 전에 새 참여자를 시작하면 `resetSession()`이 `archiveCurrent('미완료')`를 부른다.
+- 최종 전에 새 참여자를 시작하거나 `미완료로 끝내기`를 하면 `resetSession()`이 `archiveCurrent('미완료')`를 부른다. 담은 사진이 없어도 검색을 한 번이라도 했으면 남긴다(노출 기록을 잃지 않게).
 - `queries`는 검색 버튼/Enter를 누를 때마다 쌓이고, 최종 결정 뒤에는 쌓이지 않는다.
 - `liked[].qn/q`는 그 사진을 **마지막으로 담은** 검색이다.
 
-CSV 열: `no, researcher, participant_id, status, started_at, finished_at, query_count, queries, liked_count, liked_with_query, unliked_count, final_query, liked_files, final_file, final_in_liked_order`. 한 칸 안의 여러 값은 ` | `로 잇고, `liked_with_query`는 `사진@검색번호:검색어` 형식이다.
+`participants.csv` 열(`archiveCSV`): `no, researcher, participant_id, status, started_at, finished_at, query_count, queries, liked_count, liked_with_query, unliked_count, final_query, liked_files, final_file, final_in_liked_order`, 그 뒤에 2026-10-27.2부터 `app_version, pool_ver, impressions_total, impressions_in_viewport, unique_photos_seen, unique_photos_in_viewport, previews_count, preview_dwell_ms_total, padded_queries`(예전 기록은 빈칸, `impStats`). 한 칸 안의 여러 값은 ` | `로 잇고, `liked_with_query`는 `사진@검색번호:검색어` 형식이다. 앞 열 순서는 바꾸지 않는다(뒤에만 붙인다).
+
+- `impressions_total`: 모든 묶음에 그린 사진 칸 수(같은 사진을 다시 그리면 다시 셈). `impressions_in_viewport`: 그중 화면에 50% 이상 들어온 칸 수
+- `unique_photos_seen`: 그리거나 크게 본 서로 다른 사진 수. `unique_photos_in_viewport`: 화면에 들어온 서로 다른 사진 수
+- `padded_queries`: 맞은 사진이 12장보다 적어 나머지로 채운 검색 수
+
+`impressions.csv`(`impressionsCSV`, 기록 ZIP 안): 노출 한 건 = 한 줄. 검색 결과에 그린 사진 한 장(`source` = search·more·return·reload·rerender, `context` = search) 또는 크게 보기 한 번(`source` = preview, `context` = search·saved). 열: `researcher, participant_id, record_no, status, app_version, pool_ver, event_no, query_no, query, source, context, shown_at, photo_id, photo, rank, is_match, padded, hits, in_viewport, first_visible_at, tile_w, tile_h, viewport_w, viewport_h, preview_via, dwell_ms, contains, has_plant, has_rug, has_lamp, has_art, has_bedding, aspect_ratio, liked_at_end, is_final`. `contains`는 타깃 요소 이름을 `;`로 이은 것(`photoMeta` 우선, 없으면 지금 풀). 예전 기록은 줄이 없다.
 
 ## 검색 동작
 
@@ -70,8 +101,10 @@ CSV 열: `no, researcher, participant_id, status, started_at, finished_at, query
 ## 주요 함수
 
 - 연구자: `render`, `renderPool`, `drawGrid`, `drawEditor`, `addFiles`, `exportPool`, `importPool`, `confirmDelete`, `askParticipantId`, `renderArchive`, `archiveCSV`, `exportArchiveZip`
-- 참여자: `renderSearchUI`, `drawResults`, `toggleLike`(likeLog 기록), `renderSavedUI`, `confirmFinal`, `renderDoneUI`, `openPreview`
-- 공통: `archiveCurrent`, `resetSession`, `savePick`, `saveArch`, `urlFor`(blob URL 캐시)
+- 연구자(진행 표시): `renderTopRight`, `updateLive`(1초마다), 기록 요약 `impStats`, 노출 CSV `impressionsCSV`
+- 참여자: `renderSearchUI`, `doSearch`, `drawResults(source, before)`, `fitTiles`, `toggleLike`(likeLog 기록), `syncLikes`/`syncFinishBar`(아래 고정 줄), `renderSavedUI`, `confirmFinal`, `renderDoneUI`, `openPreview(id, list, fromSaved, via)`, `restoreResults`
+- 노출 기록: `logShow`, `observeTiles`(IntersectionObserver), `measureTiles`, `pvOpen`/`pvClose`
+- 공통: `archiveCurrent`, `photoMetaFor`, `resetSession`, `savePick`/`savePickSoon`(400ms 모아 저장), `saveArch`, `urlFor`(blob URL 캐시), `ensureAspect`
 
 ## 작업 방식
 
@@ -82,5 +115,7 @@ CSV 열: `no, researcher, participant_id, status, started_at, finished_at, query
 
 ## 남은 일
 
-- [ ] **사진별 CSV** (제안만 함, 사용자 답 대기): 담은 사진 한 장 = 한 줄. 열 `participant_id, photo, query_no, query, liked_at, where, is_final`. 참여자 기록 탭에 내보내기 버튼으로 추가.
+- [ ] **사진별 CSV** (제안만 함, 사용자 답 대기): 담은 사진 한 장 = 한 줄. 열 `participant_id, photo, query_no, query, liked_at, where, is_final`. 참여자 기록 탭에 내보내기 버튼으로 추가. (노출 한 건 = 한 줄인 `impressions.csv`는 기록 ZIP 안에 생겼다. 담기 기록은 아직 `participants.json`의 `likeLog`에만 있다)
+- [ ] 결과 배치를 원래 비율을 유지하는 masonry로 바꾸는 디자인 작업 예정. 바꿀 때도 `drawResults`의 `logShow`·`observeTiles`·`measureTiles` 호출(칸 크기 측정)을 유지한다.
+- [ ] 진행 대본(1026)은 "최소 4장", "연구자에게 알려 주세요."를 누른다고 되어 있다. 도구는 장수 제한이 없고 버튼 이름이 `다음 참여자`로 바뀌었으니 대본을 맞춰야 한다.
 - 기록은 브라우저 localStorage에만 있으므로 세션마다 기록 ZIP으로 백업하도록 안내되어 있다. 연구자 3명이 각자 PC에서 진행하고(참여자 P01~P12를 미리 나눠 배정), 나중에 의현이 각자의 ZIP을 `기록 불러오기`로 한 화면에 합친다. 새 기록 번호(`no`)는 같은 진행자의 자기 기록만 보고 매긴다(불러온 기록 제외).
